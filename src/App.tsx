@@ -1034,7 +1034,7 @@ export default function App() {
             <span>
               <ShieldCheck size={13} /> Vos données restent sur cet appareil.
             </span>
-            <span>PRIVÉ · VERSION 0.1</span>
+            <span>PRIVÉ · VERSION {version}</span>
           </footer>
         </main>
       </div>
