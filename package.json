@@ -1,6 +1,6 @@
 {
   "name": "app-tv-private-panel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:browser": "node tests/browser.mjs",
+    "test:locking": "node tests/locking.mjs",
     "format": "prettier --write src public index.html vite.config.ts tsconfig.json package.json tests README.md"
   },
   "dependencies": {

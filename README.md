@@ -47,7 +47,7 @@ Le service worker est activé en production seulement. Il conserve uniquement le
 
 Le coffre complet est chiffré avant toute écriture IndexedDB : PBKDF2-SHA-256, 600 000 itérations, sel aléatoire de 128 bits, AES-256-GCM, IV neuf de 96 bits à chaque écriture et données additionnelles authentifiées versionnées. Chaque sauvegarde utilise un nouveau sel et son propre mot de passe. Les paramètres importés sont bornés et les structures validées avant modification. La clé Web Crypto est non exportable, conservée uniquement en mémoire ; le mot de passe maître n’est jamais enregistré. Aucun secret dans localStorage, les URL de l’application ou les journaux.
 
-Chaque écriture est une transaction atomique. Un contrôle de version refuse les sauvegardes périmées venant d’un second onglet. Une erreur de stockage ne remplace pas l’état affiché comme enregistré. Le coffre se verrouille après 5 minutes sans interaction et dès que l’application passe en arrière-plan. Les modifications de formulaire non enregistrées sont alors abandonnées. Le mot de passe n’a aucune procédure de récupération : une sauvegarde et son propre mot de passe permettent de restaurer dans un nouveau coffre.
+Chaque écriture est une transaction atomique. Un contrôle de version refuse les sauvegardes périmées venant d’un second onglet. Une erreur de stockage ne remplace pas l’état affiché comme enregistré. Le coffre se verrouille après 5 minutes sans interaction, y compris le temps passé dans une autre application. Un bref changement de fenêtre conserve le déverrouillage et le formulaire en cours. Au retour, le délai est vérifié même si iOS a suspendu les minuteries. Une fermeture ou un rechargement complet demande toujours le mot de passe. Les modifications de formulaire non enregistrées sont alors abandonnées. Le mot de passe n’a aucune procédure de récupération : une sauvegarde et son propre mot de passe permettent de restaurer dans un nouveau coffre.
 
 Le chiffrement protège le stockage au repos. Il ne protège pas d’un appareil compromis, d’un script malveillant sur la même origine, d’une extension intrusive, d’un mot de passe devinable ni d’un partage volontaire. Aucun audit de sécurité indépendant n’a été réalisé. Aucun Face ID n’est simulé.
 
@@ -63,6 +63,7 @@ npm run build
 # Dans un terminal séparé : npm run preview
 # Installer Chromium si aucun navigateur n’est présent : npx playwright install chromium
 npm run test:browser
+npm run test:locking
 ```
 
 `CHROMIUM_PATH` peut sélectionner un navigateur système. Le parcours navigateur crée uniquement des données de test dans un profil temporaire et produit ses captures dans `/tmp`. Il couvre le stockage chiffré, le rechargement/déverrouillage, les champs masqués, le renouvellement, l’export/restauration, le format mobile et le rechargement hors ligne. Les tests unitaires couvrent chiffrement, intégrité, mauvais mots de passe, CSV, doublons, dates, renouvellements et écritures concurrentes.

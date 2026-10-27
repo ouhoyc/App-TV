@@ -5,6 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { version } from "../package.json";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -254,23 +255,41 @@ export default function App() {
   }
   useEffect(() => {
     if (!session) return;
+    const delay = 5 * 60 * 1000;
+    let deadline = Date.now() + delay;
     let timer: number;
-    const reset = () => {
+    const check = () => {
       clearTimeout(timer);
-      timer = window.setTimeout(lock, 5 * 60 * 1000);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) lock();
+      else timer = window.setTimeout(check, remaining);
     };
-    const hide = () => {
-      if (document.hidden) lock();
+    const reset = () => {
+      if (Date.now() >= deadline) {
+        check();
+        return;
+      }
+      if (document.hidden) return;
+      deadline = Date.now() + delay;
+      check();
+    };
+    const resume = () => {
+      // iOS may suspend timers in the background: check elapsed time on return.
+      if (!document.hidden) check();
     };
     for (const event of ["pointerdown", "keydown", "touchstart"])
       window.addEventListener(event, reset, { passive: true });
-    document.addEventListener("visibilitychange", hide);
-    reset();
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("focus", resume);
+    window.addEventListener("pageshow", resume);
+    check();
     return () => {
       clearTimeout(timer);
       for (const event of ["pointerdown", "keydown", "touchstart"])
         window.removeEventListener(event, reset);
-      document.removeEventListener("visibilitychange", hide);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("focus", resume);
+      window.removeEventListener("pageshow", resume);
     };
   }, [session]);
   useEffect(() => {
@@ -982,7 +1001,7 @@ export default function App() {
                 <Setting
                   icon={<LockKeyhole size={19} />}
                   title="Verrouiller le coffre"
-                  text="Automatique après 5 min d’inactivité ou à la mise en arrière-plan."
+                  text="Automatique après 5 min d’inactivité, même dans une autre application."
                   onClick={lock}
                 />
                 <div className="security-note">
@@ -996,6 +1015,7 @@ export default function App() {
                   </div>
                 </div>
                 <h3>Installer sur votre iPhone</h3>
+                <p className="fine-print">Version {version}</p>
                 <p>
                   Ouvrez le site en HTTPS dans Safari, touchez Partager, puis «
                   Sur l’écran d’accueil ». Après le premier chargement complet,

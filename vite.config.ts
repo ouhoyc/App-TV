@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { version as appVersion } from "./package.json";
 
 export default defineConfig({
   plugins: [
@@ -17,7 +18,7 @@ export default defineConfig({
           "/apple-touch-icon.png",
           ...Object.keys(bundle).map((f) => "/" + f),
         ];
-        const version = JSON.stringify("prive-" + Date.now());
+        const version = JSON.stringify("prive-" + appVersion + "-" + Date.now());
         this.emitFile({
           type: "asset",
           fileName: "sw.js",
