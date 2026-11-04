@@ -4723,3 +4723,51 @@ dialog {
 .customer-tags .customer-note.scrolling {
   flex: 1 1 0;
 }
+
+/* Version 1.1.6 — note toujours à droite du pseudo, échéance courte,
+   tremblement plus lent et plus lisible. */
+.customer-card .table-pseudo {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.customer-card-head .customer-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+}
+.customer-card-head .customer-note.scrolling {
+  flex: 1 1 0;
+  min-width: 70px;
+  max-width: none;
+}
+.customer-due strong {
+  font-size: 15px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .logo-letter {
+    animation: scdr-letter-wobble 1.25s ease-in-out infinite;
+  }
+}
+@keyframes scdr-letter-wobble {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  15% {
+    transform: translate3d(-2%, -5%, 0) rotate(-5deg) scale(1.03);
+  }
+  30% {
+    transform: translate3d(2%, 1%, 0) rotate(4deg);
+  }
+  45% {
+    transform: translate3d(-1.5%, -3%, 0) rotate(-3deg) scale(1.02);
+  }
+  60% {
+    transform: translate3d(1.5%, 0, 0) rotate(3deg);
+  }
+  75% {
+    transform: translate3d(-1%, -2%, 0) rotate(-2deg);
+  }
+}

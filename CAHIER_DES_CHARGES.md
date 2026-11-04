@@ -1,5 +1,14 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.6 — ajustements carte et animation
+
+- La note reste toujours à droite du pseudo (elle défile si elle est trop
+  longue) ; elle ne descend plus sur la ligne du contact. L’échéance est
+  raccourcie (« 4 j », « Auj. », « Expiré ») pour lui laisser la place.
+- Tremblement du logo ralenti et adouci (1,25 s par cycle) pour rester lisible.
+- Mesures relevées sur l’iPhone réel le 4 novembre : total 2,4 à 3,5 s,
+  dont Face ID 1,5 à 1,8 s, serveur 0,6 à 1,2 s, déchiffrement 0,0 s.
+
 ## Version 1.1.5 — mesure de la vitesse d’ouverture
 
 - Paramètres affiche « Dernière ouverture : démarrage · Face ID · serveur ·

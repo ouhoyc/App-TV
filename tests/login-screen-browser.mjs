@@ -128,7 +128,7 @@ try {
       promoted: getComputedStyle(el).willChange,
     })),
   );
-  assert(motion.every((m) => m.name === "scdr-letter-shake"));
+  assert(motion.every((m) => m.name === "scdr-letter-wobble"));
   assert(motion.every((m) => m.tag === "SPAN" && m.promoted === "transform"));
   assert.equal(new Set(motion.map((m) => m.delay)).size, 4);
   const frame1 = await page
