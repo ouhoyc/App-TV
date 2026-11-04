@@ -1,5 +1,10 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.2 — Bilan : client et couleur du panel
+
+- Chaque vente ou renouvellement affiche le pseudo du client, en jaune
+  (Diogo) ou bleu (Poyeland), avec la barre de couleur du panel.
+
 ## Version 1.1.1 — carte client compacte
 
 Demandé le 4 novembre : gagner en hauteur dans la liste Clients.

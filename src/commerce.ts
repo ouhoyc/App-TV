@@ -147,7 +147,7 @@ export function prepareClient(
 export function financialSummary(clients: Client[]) {
   const records = clients.flatMap((c) =>
     c.subscriptions.flatMap((s) =>
-      s.sales?.length
+      (s.sales?.length
         ? s.sales.map((sale, index) =>
             index === 0 ? { ...sale, at: s.start + "T12:00:00Z" } : sale,
           )
@@ -162,7 +162,12 @@ export function financialSummary(clients: Client[]) {
               plan: planOf(s),
               panelId: s.panelId || "",
             },
-          ],
+          ]
+      ).map((sale) => ({
+        ...sale,
+        clientPseudo: clientPseudo(c, s),
+        provider: s.provider,
+      })),
     ),
   );
   const collected = records.reduce(
