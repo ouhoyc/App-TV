@@ -25,7 +25,13 @@ import {
 import App, { Setting, type Page } from "./App";
 import DeviceSetup from "./DeviceSetup";
 import AnimatedLogo from "./AnimatedLogo";
-import { cancelOpen, finishOpen, markOpen, startOpen } from "./openTiming";
+import {
+  cancelOpen,
+  finishOpen,
+  markOpen,
+  serverDetail,
+  startOpen,
+} from "./openTiming";
 import { KeyRound } from "lucide-react";
 import { watchBackgroundLock } from "./backgroundLock";
 import {
@@ -477,7 +483,7 @@ export default function AccountApp() {
             email: unlocked.email,
             credential: unlocked.credential,
           });
-          markOpen("serveur");
+          markOpen("serveur", serverDetail("/api/account"));
           if (epoch.current !== token) return;
           if (result.profile.id !== userId)
             throw new Error(
