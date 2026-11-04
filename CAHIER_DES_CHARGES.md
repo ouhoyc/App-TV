@@ -1,5 +1,17 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.9 — ouverture après une longue pause
+
+- Mesure réelle après 1 h sans ouverture : démarrage 0,9 s, Face ID 2,4 s,
+  serveur 1,7 s, total 5,0 s.
+- Le réveil pendant Face ID ouvre aussi les connexions vers Supabase
+  (vérification de santé de l’authentification et en-tête de la base, sans
+  session ni lecture de données, limite 2,5 s), pour que la connexion qui
+  suit ne paie plus l’ouverture de ces connexions.
+- Le diagnostic « Dernière ouverture » détaille le temps serveur
+  (connexion, profil, données) grâce à l’en-tête Server-Timing, qui ne
+  transporte que des durées.
+
 ## Version 1.1.8 — défilement fiable sur iPhone
 
 - Constat sur l’iPhone réel : la note longue restait coupée (« … ») au lieu

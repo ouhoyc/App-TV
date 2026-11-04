@@ -9,10 +9,27 @@ import {
   respondError,
   validCredential,
 } from "../lib/server.js";
+// Réveil : ouvre aussi les connexions vers Supabase (authentification et base)
+// pendant Face ID, sans session ni lecture de données.
+async function warmSupabase() {
+  const url = process.env.SUPABASE_URL,
+    key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return;
+  const signal = AbortSignal.timeout(2500);
+  await Promise.allSettled([
+    fetch(url + "/auth/v1/health", { headers: { apikey: key }, signal }),
+    fetch(url + "/rest/v1/", {
+      method: "HEAD",
+      headers: { apikey: key },
+      signal,
+    }),
+  ]);
+}
 export default async function handler(req, res) {
   // Réveil discret pendant Face ID : aucune lecture de session ni de données.
   if (req.method === "HEAD") {
     res.setHeader("Cache-Control", "no-store");
+    await warmSupabase();
     return res.status(204).end();
   }
   try {
@@ -47,6 +64,7 @@ export default async function handler(req, res) {
       throw new ApiError("Adresse ou mot de passe incorrect.");
     if (b.action === "register" || b.action === "recover-finish") await edge(b);
     const db = client();
+    const t0 = Date.now();
     const { data, error } = await db.auth.signInWithPassword({
       email: b.email.trim().toLowerCase(),
       password: b.credential,
@@ -55,6 +73,7 @@ export default async function handler(req, res) {
       cookie(res, null);
       throw new ApiError("Adresse ou mot de passe incorrect.", 401);
     }
+    const t1 = Date.now();
     const { data: profile } = await db
       .from("app_tv_profiles")
       .select("*")
@@ -69,11 +88,19 @@ export default async function handler(req, res) {
       );
     }
     cookie(res, data.session);
+    const t2 = Date.now();
+    const workspace =
+      b.with_workspace === true
+        ? await workspaceSnapshot(db, profile)
+        : undefined;
+    // Durées seulement (aucune donnée) pour le diagnostic d’ouverture.
+    res.setHeader(
+      "Server-Timing",
+      `auth;dur=${t1 - t0}, profil;dur=${t2 - t1}, donnees;dur=${Date.now() - t2}`,
+    );
     return res.json({
       profile,
-      ...(b.with_workspace === true
-        ? { workspace: await workspaceSnapshot(db, profile) }
-        : {}),
+      ...(workspace ? { workspace } : {}),
     });
   } catch (error) {
     respondError(res, error);
