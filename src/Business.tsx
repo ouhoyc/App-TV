@@ -14,6 +14,7 @@ import {
   customerRows,
   panelAccent,
   clientNotes,
+  calendarMonthProfit,
 } from "./commerce";
 import type { Client, ProviderPanel, Subscription } from "./model";
 
@@ -312,6 +313,21 @@ export function FinancialDashboard({
   panels: ProviderPanel[];
 }) {
   const totals = financialSummary(clients);
+  const months = [...new Set(totals.records.map((r) => r.at.slice(0, 7)))]
+    .filter((key) => /^\d{4}-\d{2}$/.test(key))
+    .sort((a, b) => b.localeCompare(a))
+    .map((key) => {
+      const [year, month] = key.split("-").map(Number);
+      const label = new Intl.DateTimeFormat("fr-FR", {
+        month: "long",
+        year: "numeric",
+      }).format(new Date(year, month - 1, 1));
+      return {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        result: calendarMonthProfit(totals.records, year, month - 1),
+      };
+    });
   return (
     <div className="financial-dashboard">
       <div className="financial-cards">
@@ -356,6 +372,27 @@ export function FinancialDashboard({
             </div>
           );
         })}
+      </section>
+      <section className="panel month-history">
+        <h2>Bénéfice par mois</h2>
+        {!months.length ? (
+          <p>Aucune vente.</p>
+        ) : (
+          months.map(({ key, label, result }) => (
+            <div className="balance-month-row" key={key}>
+              <span>
+                <strong>{label}</strong>
+                <small>
+                  {result.sales} vente(s)
+                  {result.unpaid ? ` · ${result.unpaid} à encaisser` : ""}
+                </small>
+              </span>
+              <strong>
+                {result.incomplete ? "À compléter" : money(result.profit)}
+              </strong>
+            </div>
+          ))
+        )}
       </section>
       <section className="panel">
         <h2>Ventes et renouvellements</h2>

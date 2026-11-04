@@ -4,8 +4,11 @@
 
 - Accueil : « Bénéfice de novembre » = ventes et renouvellements datés du
   mois en cours, encaissés moins les coûts d’achat (même règle que le Bilan :
-  un impayé n’est pas compté comme encaissé, son coût est déduit). Flèches
-  ‹ › pour revoir les mois passés (pas de mois futur). Un appui ouvre le Bilan.
+  un impayé n’est pas compté comme encaissé, son coût est déduit). Un appui
+  ouvre le Bilan.
+- Bilan : nouvelle section « Bénéfice par mois » (du plus récent au plus
+  ancien), avec le nombre de ventes et d’impayés de chaque mois. Les deux
+  rectangles principaux restent inchangés.
 - Carte client : l’échéance garde son texte complet (« Dans 4 j »), en plus
   petit.
 - Ouverture : dès que Face ID s’affiche, un appel HEAD vide réveille la

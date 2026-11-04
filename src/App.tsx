@@ -12,7 +12,6 @@ import {
   ArrowUpRight,
   ArrowRight,
   Check,
-  ChevronLeft,
   ChevronRight,
   Clock3,
   Download,
@@ -306,7 +305,6 @@ export default function App({
     [storageError, setStorageError] = useState(false);
   const [archived, setArchived] = useState(false),
     [customerOrder, setCustomerOrder] = useState<CustomerOrder>("access"),
-    [monthOffset, setMonthOffset] = useState(0),
     [expiryFilter, setExpiryFilter] = useState("followup");
   const scrollPane = useRef<HTMLDivElement>(null);
   function navigate(next: Page) {
@@ -637,11 +635,7 @@ export default function App({
     .sort((a, b) =>
       a.subscription.expires.localeCompare(b.subscription.expires),
     );
-  const monthDate = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth() + monthOffset,
-    1,
-  );
+  const monthDate = new Date();
   const month = calendarMonthProfit(
     financialSummary(vault.clients).records,
     monthDate.getFullYear(),
@@ -979,25 +973,6 @@ export default function App({
                     </em>
                   </span>
                 </button>
-                <span className="month-profit-nav">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Mois précédent"
-                    onClick={() => setMonthOffset((n) => n - 1)}
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Mois suivant"
-                    disabled={monthOffset >= 0}
-                    onClick={() => setMonthOffset((n) => Math.min(0, n + 1))}
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </span>
               </section>
               <div className="urgency-strip">
                 <button

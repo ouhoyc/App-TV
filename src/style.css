@@ -4820,3 +4820,35 @@ dialog {
 .month-profit-nav .icon-button:disabled {
   opacity: 0.3;
 }
+.balance-month-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffffff12;
+}
+.balance-month-row:last-child {
+  border-bottom: 0;
+}
+.balance-month-row span strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+}
+.balance-month-row span small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.balance-month-row > strong {
+  font-size: 16px;
+  font-weight: 750;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.month-history {
+  padding-bottom: 6px;
+}
+.month-history .balance-month-row {
+  margin: 0 20px;
+}
