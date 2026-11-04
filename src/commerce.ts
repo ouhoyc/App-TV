@@ -204,12 +204,21 @@ export function customerContact(client: Client) {
       : { platform: "Téléphone", value: client.phone })
   );
 }
+// WhatsApp exige le format international sans « + » ni zéro initial :
+// 06 12 34 56 78 → 33612345678 ; +33 6… ou 0033 6… restent valides.
+export function whatsappNumber(value: string) {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  else if (!value.trim().startsWith("+") && /^0\d{9}$/.test(digits))
+    digits = "33" + digits.slice(1);
+  return digits;
+}
 export function contactUrl(platform: string, value: string) {
   const v = value.trim(),
     username = v.replace(/^@/, "");
   if (!v) return "";
   if (platform === "Téléphone") return "tel:" + v.replace(/[^+\d]/g, "");
-  if (platform === "WhatsApp") return "https://wa.me/" + v.replace(/\D/g, "");
+  if (platform === "WhatsApp") return "https://wa.me/" + whatsappNumber(v);
   if (platform === "Telegram")
     return "https://t.me/" + encodeURIComponent(username);
   if (platform === "Snapchat")
