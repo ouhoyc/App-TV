@@ -4457,3 +4457,95 @@ dialog {
   flex: 0 1 auto;
   min-width: 0;
 }
+
+/* Version 1.1.2 — Bilan : nom du client et couleur du panel par vente. */
+.financial-dashboard .customer-table tr {
+  position: relative;
+  padding-left: 12px;
+  grid-template-columns: 1fr auto;
+}
+.financial-dashboard .customer-table tr::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 4px;
+  background: #ffffff26;
+}
+.financial-dashboard .customer-table tr.panel-diogo::before {
+  background: var(--diogo);
+}
+.financial-dashboard .customer-table tr.panel-poyeland::before {
+  background: var(--poyeland);
+}
+.financial-dashboard .customer-table td:nth-child(1) {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.financial-dashboard .customer-table td.sale-client {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td.sale-client.panel-diogo {
+  color: var(--diogo);
+}
+.financial-dashboard .customer-table td.sale-client.panel-poyeland {
+  color: var(--poyeland);
+}
+.financial-dashboard .customer-table td:nth-child(2)::before {
+  content: none;
+}
+.financial-dashboard .customer-table td:nth-child(3) {
+  grid-column: 1;
+  grid-row: 3;
+  font-size: 13px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+}
+.financial-dashboard .customer-table td:nth-child(3) {
+  white-space: nowrap;
+}
+.financial-dashboard .customer-table td:nth-child(4) {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td:nth-child(4)::before {
+  content: none;
+}
+.financial-dashboard .customer-table td:nth-child(5) {
+  grid-column: 2;
+  grid-row: 3;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.financial-dashboard .customer-table td:nth-child(5)::before {
+  content: "Achat ";
+}
+.financial-dashboard .customer-table td:nth-child(6) {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td:nth-child(6)::before {
+  content: "Bénéfice ";
+  font-weight: 500;
+  color: var(--muted);
+}

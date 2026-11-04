@@ -336,6 +336,7 @@ export function FinancialDashboard({
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Client</th>
                   <th>Panel</th>
                   <th>Vente</th>
                   <th>Achat</th>
@@ -345,29 +346,36 @@ export function FinancialDashboard({
               <tbody>
                 {[...totals.records]
                   .sort((a, b) => b.at.localeCompare(a.at))
-                  .map((s) => (
-                    <tr key={s.id}>
-                      <td>{new Date(s.at).toLocaleDateString("fr-FR")}</td>
-                      <td>
-                        {panels.find((p) => p.id === s.panelId)?.name || "—"}
-                      </td>
-                      <td>
-                        {s.sale === "" ? "—" : money(s.sale)}
-                        {!s.paid && (
-                          <span className="unpaid-text"> À encaisser</span>
-                        )}
-                      </td>
-                      <td>{s.cost === "" ? "—" : money(s.cost)}</td>
-                      <td>
-                        {s.sale === "" || s.cost === ""
-                          ? "—"
-                          : money(
-                              (s.paid ? Number(s.sale) || 0 : 0) -
-                                (Number(s.cost) || 0),
-                            )}
-                      </td>
-                    </tr>
-                  ))}
+                  .map((s) => {
+                    const panel =
+                      panels.find((p) => p.id === s.panelId)?.name ||
+                      s.provider ||
+                      "";
+                    return (
+                      <tr key={s.id} className={panelAccent(panel)}>
+                        <td>{new Date(s.at).toLocaleDateString("fr-FR")}</td>
+                        <td className={"sale-client " + panelAccent(panel)}>
+                          {s.clientPseudo}
+                        </td>
+                        <td>{panel || "—"}</td>
+                        <td>
+                          {s.sale === "" ? "—" : money(s.sale)}
+                          {!s.paid && (
+                            <span className="unpaid-text"> À encaisser</span>
+                          )}
+                        </td>
+                        <td>{s.cost === "" ? "—" : money(s.cost)}</td>
+                        <td>
+                          {s.sale === "" || s.cost === ""
+                            ? "—"
+                            : money(
+                                (s.paid ? Number(s.sale) || 0 : 0) -
+                                  (Number(s.cost) || 0),
+                              )}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
