@@ -1,5 +1,21 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.1 — carte client compacte
+
+Demandé le 4 novembre : gagner en hauteur dans la liste Clients.
+
+### Ce qui a changé et pourquoi
+
+- Carte en 3 lignes au lieu de 6 (environ 4 clients visibles au lieu de 2).
+- Ligne 1 : pseudo coloré par panel, pièces rouges des impayés juste à côté,
+  note courte du client en étiquette (ex. « Via … »), échéance et date.
+- Ligne 2 : mot de passe et lien dans deux cases ; un appui copie la valeur
+  (la case passe au vert). Plus de boutons copier séparés.
+- Ligne 3 : application, durée, contact avec son icône (Snapchat, WhatsApp,
+  téléphone, Telegram ; dessinées localement) et bouton « Accès ».
+  Un appui sur le contact ouvre la conversation.
+- Le prix de vente n’apparaît plus sur la carte (fiche client et Bilan).
+
 ## Version 1.1.0 — nouveau design « Liquid Glass »
 
 Choisi le 4 novembre parmi trois maquettes (A Liquid Glass, B Bento,

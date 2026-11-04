@@ -4285,3 +4285,175 @@ dialog {
 .expiry-row {
   color: var(--text);
 }
+
+/* Version 1.1.1 — carte client compacte (3 lignes). */
+.copy-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.customer-cards {
+  gap: 8px;
+}
+.customer-card {
+  border-radius: 18px;
+  padding: 9px 12px 10px 16px;
+}
+.customer-card-head {
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.customer-card .table-pseudo {
+  font-size: 17px;
+  min-height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 48%;
+  flex-shrink: 1;
+}
+.customer-card .unpaid-icon {
+  flex-shrink: 0;
+}
+.customer-note {
+  min-width: 0;
+  flex-shrink: 1;
+  font-size: 12px;
+  font-weight: 650;
+  color: #cfd7e3;
+  background: #ffffff10;
+  border-radius: 7px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.customer-due {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.customer-due strong {
+  display: inline;
+  font-size: 14px;
+}
+.customer-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 6px;
+  margin-top: 5px;
+}
+.copy-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: #ffffff0b;
+  border: 1px solid #ffffff14;
+  color: var(--muted);
+  text-align: left;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.copy-cell code {
+  min-width: 0;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  color: #e9eef6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.copy-cell:active {
+  background: #ffffff1c;
+}
+.copy-cell.copied {
+  color: var(--good-text);
+  border-color: #9ad2bc90;
+  background: #9ad2bc1f;
+}
+.copy-cell:disabled {
+  opacity: 0.55;
+}
+.customer-card-foot {
+  margin-top: 6px;
+  gap: 6px;
+}
+.customer-tags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 5px;
+}
+.customer-tag {
+  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.customer-tag.contact {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+.contact-icon {
+  flex-shrink: 0;
+}
+.copy-access {
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: 11px;
+  font-size: 13px;
+}
+.customer-card .unpaid-icon {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  margin: 0;
+}
+.customer-card .table-pseudo {
+  max-width: none;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.customer-note {
+  flex: 0 100 auto;
+}
+.customer-due {
+  flex-shrink: 0;
+}
+.customer-tag.app,
+.customer-tag:not(.contact) {
+  flex-shrink: 0;
+}
+.customer-tag.contact {
+  display: inline-flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .customer-due small {
+    display: none;
+  }
+}
+/* Le pseudo garde la priorité : la note se réduit d’abord. */
+.customer-card .table-pseudo {
+  flex: none;
+  max-width: 60%;
+}
+.customer-note {
+  flex: 0 1 auto;
+  min-width: 0;
+}
