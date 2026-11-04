@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   ArrowRight,
   Check,
+  ChevronLeft,
   ChevronRight,
   Clock3,
   Download,
@@ -103,6 +104,7 @@ import {
   planOf,
   prepareClient,
   financialSummary,
+  calendarMonthProfit,
   money,
 } from "./commerce";
 import Notifications from "./Notifications";
@@ -304,6 +306,7 @@ export default function App({
     [storageError, setStorageError] = useState(false);
   const [archived, setArchived] = useState(false),
     [customerOrder, setCustomerOrder] = useState<CustomerOrder>("access"),
+    [monthOffset, setMonthOffset] = useState(0),
     [expiryFilter, setExpiryFilter] = useState("followup");
   const scrollPane = useRef<HTMLDivElement>(null);
   function navigate(next: Page) {
@@ -634,7 +637,22 @@ export default function App({
     .sort((a, b) =>
       a.subscription.expires.localeCompare(b.subscription.expires),
     );
-  const monthTotals = financialSummary(vault.clients);
+  const monthDate = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth() + monthOffset,
+    1,
+  );
+  const month = calendarMonthProfit(
+    financialSummary(vault.clients).records,
+    monthDate.getFullYear(),
+    monthDate.getMonth(),
+  );
+  const monthName = new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    ...(monthDate.getFullYear() !== new Date().getFullYear()
+      ? { year: "numeric" as const }
+      : {}),
+  }).format(monthDate);
   const panelNameFor = (client: Client, sub: Subscription) =>
     providerPanels(cloud ? cloud.providerFor(client.id) : vault.provider).find(
       (p) => p.id === sub.panelId,
@@ -934,25 +952,53 @@ export default function App({
                   }
                 />
               </button>
-              <button
-                type="button"
-                className="month-profit"
-                aria-label="Voir le bilan"
-                onClick={() => navigate("balance")}
-              >
-                <span className="month-profit-icon">
-                  <Coins size={22} />
+              <section className="month-profit" aria-label="Bénéfice du mois">
+                <button
+                  type="button"
+                  className="month-profit-main"
+                  aria-label="Voir le bilan"
+                  onClick={() => navigate("balance")}
+                >
+                  <span className="month-profit-icon">
+                    <Coins size={22} />
+                  </span>
+                  <span className="month-profit-text">
+                    <small>
+                      Bénéfice{" "}
+                      {/^[aeiouyâéèêîô]/i.test(monthName) ? "d’" : "de "}
+                      {monthName}
+                    </small>
+                    <strong>
+                      {month.incomplete ? "À compléter" : money(month.profit)}
+                    </strong>
+                    <em>
+                      {month.sales
+                        ? `${month.sales} vente(s)` +
+                          (month.unpaid ? ` · ${month.unpaid} à encaisser` : "")
+                        : "Aucune vente ce mois-ci"}
+                    </em>
+                  </span>
+                </button>
+                <span className="month-profit-nav">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Mois précédent"
+                    onClick={() => setMonthOffset((n) => n - 1)}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Mois suivant"
+                    disabled={monthOffset >= 0}
+                    onClick={() => setMonthOffset((n) => Math.min(0, n + 1))}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </span>
-                <span className="month-profit-text">
-                  <small>Bénéfice du mois</small>
-                  <strong>
-                    {monthTotals.annualIncomplete
-                      ? "À compléter"
-                      : money(monthTotals.monthly)}
-                  </strong>
-                </span>
-                <ChevronRight size={18} />
-              </button>
+              </section>
               <div className="urgency-strip">
                 <button
                   onClick={() => {

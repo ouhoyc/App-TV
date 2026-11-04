@@ -196,6 +196,26 @@ export function financialSummary(clients: Client[]) {
     annualIncomplete: annual.some((s) => s.sale === "" || s.cost === ""),
   };
 }
+// Bénéfice d’un mois calendaire (ventes et renouvellements datés de ce mois).
+// Même règle que le Bilan : une vente non réglée ne compte pas comme encaissée,
+// son coût d’achat est déduit.
+export function calendarMonthProfit(
+  records: { at: string; sale: string; cost: string; paid: boolean }[],
+  year: number,
+  month: number,
+) {
+  const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const rows = records.filter((r) => r.at.slice(0, 7) === key);
+  return {
+    profit: rows.reduce(
+      (n, r) => n + (r.paid ? Number(r.sale) || 0 : 0) - (Number(r.cost) || 0),
+      0,
+    ),
+    sales: rows.length,
+    unpaid: rows.filter((r) => !r.paid).length,
+    incomplete: rows.some((r) => r.sale === "" || r.cost === ""),
+  };
+}
 export function customerContact(client: Client) {
   return (
     client.contact ||

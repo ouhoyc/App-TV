@@ -1,5 +1,14 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.7 — bénéfice du mois calendaire
+
+- Accueil : « Bénéfice de novembre » = ventes et renouvellements datés du
+  mois en cours, encaissés moins les coûts d’achat (même règle que le Bilan :
+  un impayé n’est pas compté comme encaissé, son coût est déduit). Flèches
+  ‹ › pour revoir les mois passés (pas de mois futur). Un appui ouvre le Bilan.
+- Carte client : l’échéance garde son texte complet (« Dans 4 j »), en plus
+  petit.
+
 ## Version 1.1.6 — ajustements carte et animation
 
 - La note reste toujours à droite du pseudo (elle défile si elle est trop

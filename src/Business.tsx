@@ -93,14 +93,6 @@ function ScrollingNote({ text }: { text: string }) {
     </span>
   );
 }
-// Échéance courte pour laisser la place au pseudo et à la note.
-function compactDue(s: Subscription, now = Date.now()) {
-  const full = dueLabel(s, now);
-  if (full.startsWith("Dans ")) return full.slice(5);
-  if (full.startsWith("Encore ")) return full.slice(7);
-  if (full === "Aujourd’hui") return "Auj.";
-  return full;
-}
 export function accessText(pseudo: string, sub: Subscription) {
   return [
     ["Pseudo", pseudo],
@@ -253,7 +245,7 @@ export function CustomerTable({
                 {note && <ScrollingNote text={note} />}
                 {s && (
                   <span className="customer-due">
-                    <strong title={dueLabel(s)}>{compactDue(s)}</strong>
+                    <strong>{dueLabel(s)}</strong>
                     <small>{shortDate(s)}</small>
                   </span>
                 )}
