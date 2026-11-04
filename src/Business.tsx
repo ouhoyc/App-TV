@@ -93,6 +93,14 @@ function ScrollingNote({ text }: { text: string }) {
     </span>
   );
 }
+// Échéance courte pour laisser la place au pseudo et à la note.
+function compactDue(s: Subscription, now = Date.now()) {
+  const full = dueLabel(s, now);
+  if (full.startsWith("Dans ")) return full.slice(5);
+  if (full.startsWith("Encore ")) return full.slice(7);
+  if (full === "Aujourd’hui") return "Auj.";
+  return full;
+}
 export function accessText(pseudo: string, sub: Subscription) {
   return [
     ["Pseudo", pseudo],
@@ -181,8 +189,6 @@ export function CustomerTable({
           const pseudo = clientPseudo(c, s || undefined);
           const server = s ? serverAddress(s) : "";
           const note = clientNotes(c).split("\n")[0].trim();
-          // Pseudo long : la note passe sur la ligne de l’application.
-          const longName = pseudo.length > 13;
           const key = c.id + ":" + (s?.id || "empty");
           const copyCell = (
             field: "password" | "server",
@@ -244,10 +250,10 @@ export function CustomerTable({
                     <Coins size={18} />
                   </button>
                 )}
-                {note && !longName && <ScrollingNote text={note} />}
+                {note && <ScrollingNote text={note} />}
                 {s && (
                   <span className="customer-due">
-                    <strong>{dueLabel(s)}</strong>
+                    <strong title={dueLabel(s)}>{compactDue(s)}</strong>
                     <small>{shortDate(s)}</small>
                   </span>
                 )}
@@ -260,7 +266,6 @@ export function CustomerTable({
                   </div>
                   <div className="customer-card-foot">
                     <span className="customer-tags">
-                      {note && longName && <ScrollingNote text={note} />}
                       {s.player && (
                         <span className="customer-tag app">{s.player}</span>
                       )}
