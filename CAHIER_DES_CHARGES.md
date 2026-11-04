@@ -1,5 +1,13 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.5 — mesure de la vitesse d’ouverture
+
+- Paramètres affiche « Dernière ouverture : démarrage · Face ID · serveur ·
+  déchiffrement · total ». Mesure gardée en mémoire uniquement (aucun
+  stockage, aucun envoi), pour cibler l’optimisation sur l’iPhone réel.
+- `vercel.json` : `fluid: true` explicite (Fluid compute, déjà actif par
+  défaut sur ce projet) pour limiter les réveils lents du serveur.
+
 ## Version 1.1.4 — corrections WhatsApp, note, animation
 
 - WhatsApp : un numéro saisi en 06… est converti au format international

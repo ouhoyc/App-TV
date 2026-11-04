@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import Coins from "./StackedCoins";
 import { APP_VERSION } from "./version";
+import { lastOpenSummary } from "./openTiming";
 import { externalBrowserHref, normalizeWebAddress } from "./externalBrowser";
 import type { Profile } from "./cloudStore";
 import {
@@ -1362,6 +1363,11 @@ export default function App({
               </section>
               {settingsFooter}
               <p className="fine-print">SCDR TV · Version {APP_VERSION}</p>
+              {lastOpenSummary() && (
+                <p className="fine-print open-timing">
+                  Dernière ouverture : {lastOpenSummary()}
+                </p>
+              )}
             </div>
           )}
         </main>

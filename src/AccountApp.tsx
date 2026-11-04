@@ -25,6 +25,7 @@ import {
 import App, { Setting, type Page } from "./App";
 import DeviceSetup from "./DeviceSetup";
 import AnimatedLogo from "./AnimatedLogo";
+import { cancelOpen, finishOpen, markOpen, startOpen } from "./openTiming";
 import { KeyRound } from "lucide-react";
 import { watchBackgroundLock } from "./backgroundLock";
 import {
@@ -336,6 +337,7 @@ export default function AccountApp() {
     );
     await operate(async () => {
       const token = epoch.current;
+      startOpen();
       const address = (profile?.email || enteredEmail).trim().toLowerCase();
       if (
         (mode === "register" || mode === "recover") &&
@@ -370,6 +372,7 @@ export default function AccountApp() {
         }
       }
       const data = readySnapshot || (await request<Snapshot>("workspace"));
+      markOpen("serveur");
       if (epoch.current !== token) return;
       setProfile(data.profile);
       setEmail(data.profile.email);
@@ -379,6 +382,7 @@ export default function AccountApp() {
         key = await importIdentity(
           await openSecret(data.keyring.password_envelope, enteredPassword),
         );
+        markOpen("mot de passe");
       } else {
         const created = await createIdentity(enteredPassword);
         if (epoch.current !== token) return;
@@ -406,6 +410,8 @@ export default function AccountApp() {
         data.profile.id,
         data.keyring ? data : undefined,
       );
+      markOpen("déchiffrement");
+      finishOpen();
     });
   }
   async function logout() {
@@ -449,8 +455,10 @@ export default function AccountApp() {
       const token = epoch.current;
       autoAttempted.current = true;
       devicePrompt.current = true;
+      startOpen();
       try {
         const unlocked = await unlockDevice(userId);
+        markOpen("Face ID");
         let readySnapshot: Snapshot | undefined;
         if (epoch.current !== token) return;
         if (unlocked.credential && unlocked.email) {
@@ -463,6 +471,7 @@ export default function AccountApp() {
             email: unlocked.email,
             credential: unlocked.credential,
           });
+          markOpen("serveur");
           if (epoch.current !== token) return;
           if (result.profile.id !== userId)
             throw new Error(
@@ -477,10 +486,13 @@ export default function AccountApp() {
           );
         // Fetching the workspace still verifies the live server session and role.
         await loadWorkspace(unlocked.privateKey, userId, readySnapshot);
+        markOpen("déchiffrement");
+        finishOpen();
         if (epoch.current !== token) return;
         setIdentity(unlocked.privateKey);
         setPassword("");
       } catch (e) {
+        cancelOpen();
         if (e instanceof HttpError && e.status === 401)
           throw new Error(
             "La connexion Face ID doit être réactivée. Connectez-vous avec votre mot de passe puis ouvrez les réglages Face ID.",
