@@ -1,5 +1,15 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.10 — réveil réel de la base pendant Face ID
+
+- Mesure réelle 1.1.9 après une pause : total 3,7 s (contre 5,0 s), serveur
+  1,2 s dont lecture du profil 0,5 s (première vraie requête en base).
+- Le réveil ajoute une requête vide anonyme sur `app_tv_profiles`
+  (`select=id&limit=0`, clé publique seule, sans jeton de session). Le rôle
+  anonyme n’a aucun droit sur cette table (schéma : `revoke all ... from anon`),
+  donc la base répond « permission refusée » sans aucune ligne ; la réponse
+  n’est jamais transmise au téléphone. Test unitaire dédié.
+
 ## Version 1.1.9 — ouverture après une longue pause
 
 - Mesure réelle après 1 h sans ouverture : démarrage 0,9 s, Face ID 2,4 s,
