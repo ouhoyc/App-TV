@@ -2,6 +2,8 @@ import {
   useEffect,
   useRef,
   useState,
+  lazy,
+  Suspense,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -13,8 +15,6 @@ import {
   ChevronRight,
   Clock3,
   Download,
-  Eye,
-  EyeOff,
   FileUp,
   Home,
   KeyRound,
@@ -25,6 +25,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  Network,
   X,
   Copy,
   Share2,
@@ -34,7 +35,13 @@ import {
   Trash2,
   Pencil,
   CircleHelp,
+  Images,
+  ExternalLink,
 } from "lucide-react";
+import Coins from "./StackedCoins";
+import { APP_VERSION } from "./version";
+import { externalBrowserHref, normalizeWebAddress } from "./externalBrowser";
+import type { Profile } from "./cloudStore";
 import {
   decrypt,
   derive,
@@ -53,17 +60,49 @@ import {
   mergeClients,
   newClient,
   newSubscription,
+  providerPanels,
   renew,
   searchClients,
   state,
   today,
   validateVault,
+  contactPlatforms,
   type Client,
+  type ProviderPanel,
   type Subscription,
+  type Plan,
   type Vault,
 } from "./model";
 import { csvFields, mapCsv, parseCsv, type CsvField } from "./csv";
-import { providerAvailability } from "./provider";
+import {
+  PROVIDER_URL,
+  normalizeProviderKey,
+  testProviderConnection,
+  type ProviderAccount,
+} from "./provider";
+import { watchBackgroundLock } from "./backgroundLock";
+import ProviderWorkflow, { ProviderHistory } from "./ProviderWorkflow";
+import type { ProviderContext, ProviderOperation } from "./providerWorkflow";
+import type { CloudPayload } from "./cloudCrypto";
+import { CustomerTable, FinancialDashboard } from "./Business";
+import {
+  applyPlan,
+  customerContact,
+  clientPseudo,
+  panelAccent,
+  clientNotes,
+  serverAddress,
+  planMonths,
+  paidSubscription,
+  panelCost,
+  planOf,
+  prepareClient,
+} from "./commerce";
+import Notifications from "./Notifications";
+import LiveClients from "./LiveClients";
+import { PanelAccess, panelSite } from "./PanelAccess";
+import { takeNotificationClient } from "./notificationNavigation";
+const MediaLibrary = lazy(() => import("./Media"));
 
 const date = (s: string) =>
   new Intl.DateTimeFormat("fr-FR", {
@@ -81,7 +120,14 @@ const initials = (s: string) =>
     .toUpperCase();
 const message = (c: Client, s: Subscription) =>
   `Bonjour ${c.name},\n\nVoici tes informations de connexion :\n\nService : ${s.provider}\nIdentifiant : ${s.username}\nMot de passe : ${s.password}\nServeur : ${s.server}\nExpiration : ${date(s.expires)}`;
-type Page = "dashboard" | "clients" | "expirations" | "settings";
+export type Page =
+  | "dashboard"
+  | "clients"
+  | "resellers"
+  | "expirations"
+  | "balance"
+  | "media"
+  | "settings";
 type Dialog =
   | { kind: "edit"; client: Client }
   | { kind: "detail"; id: string }
@@ -91,6 +137,15 @@ type Dialog =
   | { kind: "restore" }
   | { kind: "csv" }
   | { kind: "provider" }
+  | { kind: "provider-history" }
+  | {
+      kind: "provider-action";
+      client: Client;
+      subscription?: Subscription;
+      mode: ProviderContext["mode"];
+      operation?: ProviderOperation;
+      context?: ProviderContext;
+    }
   | null;
 function Badge({ subscription }: { subscription: Subscription }) {
   const label = state(subscription);
@@ -166,20 +221,12 @@ function Secret({
   value: string;
   onCopy: (v: string) => void;
 }) {
-  const [visible, setVisible] = useState(false);
   return (
     <div className="secret">
       <div>
         <small>{label}</small>
-        <p>{value ? (visible ? value : "••••••••••••") : "Non renseigné"}</p>
+        <p>{value || "Non renseigné"}</p>
       </div>
-      <button
-        className="icon-button"
-        onClick={() => setVisible(!visible)}
-        aria-label={(visible ? "Masquer " : "Afficher ") + label}
-      >
-        {visible ? <EyeOff size={17} /> : <Eye size={17} />}
-      </button>
       <button
         className="icon-button"
         disabled={!value}
@@ -192,29 +239,93 @@ function Secret({
   );
 }
 
-export default function App() {
+export interface CloudWorkspace {
+  vault: Vault;
+  privateKey: CryptoKey;
+  save: (vault: Vault) => Promise<void>;
+  onLock: () => void;
+  profile: Profile;
+  ownerLabel: (clientId: string) => string;
+  providerFor: (clientId: string) => Vault["provider"];
+  ownerFor: (clientId: string) => string;
+  sealProviderContext: (
+    client: Client,
+    meta: ProviderContext,
+  ) => Promise<CloudPayload>;
+  ready: boolean;
+  viewOwners: string[];
+  sealMedia: (asset: unknown) => Promise<CloudPayload>;
+  syncReminders: () => Promise<unknown>;
+  onRefresh: () => void;
+  onLegacyImport: () => void;
+}
+export default function App({
+  cloud,
+  accountHeader,
+  accountNotices,
+  settingsContent,
+  settingsFooter,
+  resellersContent,
+  initialPage = "dashboard",
+  onPageChange,
+}: {
+  cloud?: CloudWorkspace;
+  accountHeader?: ReactNode;
+  accountNotices?: ReactNode;
+  settingsContent?: ReactNode;
+  settingsFooter?: ReactNode;
+  resellersContent?: ReactNode;
+  initialPage?: Page;
+  onPageChange?: (page: Page) => void;
+} = {}) {
   const [envelope, setEnvelope] = useState<Envelope | null | undefined>(
       undefined,
     ),
-    [vault, setVault] = useState<Vault | null>(null),
-    [session, setSession] = useState<Session | null>(null);
+    [vault, setVault] = useState<Vault | null>(cloud?.vault || null),
+    [session, setSession] = useState<Session | null>(
+      cloud ? { key: cloud.privateKey, salt: "", iterations: 0 } : null,
+    );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [password, setPassword] = useState(""),
     [confirmation, setConfirmation] = useState(""),
     [accepted, setAccepted] = useState(false);
-  const [page, setPage] = useState<Page>("dashboard"),
+  const [page, setPage] = useState<Page>(initialPage),
     [query, setQuery] = useState(""),
     [dialog, setDialog] = useState<Dialog>(null),
     [notice, setNotice] = useState(""),
     [online, setOnline] = useState(navigator.onLine),
     [storageError, setStorageError] = useState(false);
   const [archived, setArchived] = useState(false),
-    [expiryFilter, setExpiryFilter] = useState("7");
-  const locked = useRef(true);
+    [expiryFilter, setExpiryFilter] = useState("followup");
+  const scrollPane = useRef<HTMLDivElement>(null);
+  function navigate(next: Page) {
+    setPage(next);
+    onPageChange?.(next);
+    setQuery("");
+    scrollPane.current?.scrollTo({ top: 0 });
+  }
+  const locked = useRef(!cloud);
   const writing = useRef(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    function open() {
+      if (!vault) return;
+      const id = takeNotificationClient(vault.clients.map((c) => c.id));
+      if (id) {
+        navigate("clients");
+        setDialog({ kind: "detail", id });
+      }
+    }
+    open();
+    window.addEventListener("scdr-notification-open", open);
+    return () => window.removeEventListener("scdr-notification-open", open);
+  }, [vault]);
+  useEffect(() => {
+    if (cloud) void cloud.syncReminders().catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (cloud) return;
     loadEnvelope()
       .then(setEnvelope)
       .catch((e) => {
@@ -242,6 +353,10 @@ export default function App() {
     };
   }, []);
   function lock() {
+    if (cloud) {
+      cloud.onLock();
+      return;
+    }
     locked.current = true;
     setSession(null);
     setVault(null);
@@ -253,26 +368,12 @@ export default function App() {
     setNotice("");
   }
   useEffect(() => {
-    if (!session) return;
-    let timer: number;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = window.setTimeout(lock, 5 * 60 * 1000);
-    };
-    const hide = () => {
-      if (document.hidden) lock();
-    };
-    for (const event of ["pointerdown", "keydown", "touchstart"])
-      window.addEventListener(event, reset, { passive: true });
-    document.addEventListener("visibilitychange", hide);
-    reset();
-    return () => {
-      clearTimeout(timer);
-      for (const event of ["pointerdown", "keydown", "touchstart"])
-        window.removeEventListener(event, reset);
-      document.removeEventListener("visibilitychange", hide);
-    };
-  }, [session]);
+    // AccountApp owns the cloud session's lock lifecycle and Face ID resume.
+    // Two visibility listeners otherwise turn a background lock into a manual
+    // lock, suppressing the automatic Face ID attempt on return.
+    if (cloud || !session) return;
+    return watchBackgroundLock(lock);
+  }, [session, Boolean(cloud)]);
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(""), 7000);
@@ -320,6 +421,11 @@ export default function App() {
     writing.current = true;
     setBusy(true);
     try {
+      if (cloud) {
+        await cloud.save(next);
+        if (!locked.current) setVault(next);
+        return;
+      }
       const saved = await encrypt(next, session);
       await saveEnvelope(saved, envelope!.ciphertext);
       setEnvelope(saved);
@@ -352,6 +458,10 @@ export default function App() {
   }
   async function saveClient(client: Client) {
     if (!vault) return;
+    client = prepareClient(
+      vault.clients.find((c) => c.id === client.id),
+      client,
+    );
     await commit({
       ...vault,
       clients: vault.clients.some((c) => c.id === client.id)
@@ -359,15 +469,19 @@ export default function App() {
         : [client, ...vault.clients],
     });
     setDialog(null);
-    setNotice("Fiche enregistrée dans le coffre.");
+    setNotice(
+      cloud
+        ? "Fiche chiffrée et enregistrée sur le serveur."
+        : "Fiche enregistrée dans le coffre.",
+    );
   }
   const brand = (
     <div className="brand">
       <span className="brand-symbol">
-        p<span>·</span>
+        <img src="/scdr-tv-192.png" alt="" width="40" height="40" />
       </span>
       <span>
-        privé<sup>PERSONAL WORKSPACE</sup>
+        SCDR TV<sup>CLIENTS & ABONNEMENTS</sup>
       </span>
     </div>
   );
@@ -386,7 +500,13 @@ export default function App() {
           </div>
           <span className="eyebrow">CLIENTS & ABONNEMENTS</span>
           <h1>
-            {envelope ? "Heureux de vous retrouver." : "Un espace à vous."}
+            {storageError
+              ? "Stockage inaccessible."
+              : envelope === undefined
+                ? "Ouverture de votre espace…"
+                : envelope
+                  ? "Heureux de vous retrouver."
+                  : "Un espace à vous."}
           </h1>
           <p className="subtitle">
             {envelope
@@ -456,6 +576,23 @@ export default function App() {
               </button>
             </form>
           )}
+          {envelope === null && !storageError && (
+            <details className="storage-help">
+              <summary>Vous aviez déjà créé un coffre ?</summary>
+              <p>
+                Aucun coffre n’a été trouvé dans ce navigateur à cette adresse.
+                Revenez à l’adresse utilisée au départ et ouvrez l’app de la
+                même façon : Safari ou icône d’accueil. Les liens d’aperçu et la
+                navigation privée peuvent utiliser un stockage différent.
+              </p>
+              <p>
+                Cette version n’a pas encore de compte utilisateur ni de
+                sauvegarde serveur. Créer un nouveau mot de passe ne récupère
+                pas vos anciennes fiches. Une sauvegarde exportée peut être
+                restaurée depuis les paramètres après création d’un coffre.
+              </p>
+            </details>
+          )}
           <div className="privacy-line">
             <ShieldCheck size={15} />
             <span>Chiffrement AES-256-GCM · Données sur cet appareil</span>
@@ -494,10 +631,12 @@ export default function App() {
       ? vault.clients.find((c) => c.id === dialog.id)
       : null;
   const nav = [
-    { id: "dashboard" as const, label: "Vue d’ensemble", icon: Home },
+    { id: "dashboard" as const, label: "Accueil", icon: Home },
     { id: "clients" as const, label: "Clients", icon: Users },
+    { id: "resellers" as const, label: "Revendeurs", icon: Network },
     { id: "expirations" as const, label: "Expirations", icon: Clock3 },
-    { id: "settings" as const, label: "Paramètres", icon: Settings },
+    { id: "balance" as const, label: "Bilan", icon: Coins },
+    { id: "media" as const, label: "Médias", icon: Images },
   ];
   function clientRow(c: Client) {
     const s = [...c.subscriptions].sort((a, b) =>
@@ -509,10 +648,22 @@ export default function App() {
         className="client-row"
         onClick={() => setDialog({ kind: "detail", id: c.id })}
       >
-        <span className="avatar">{initials(c.name)}</span>
+        <span className="avatar">{initials(clientPseudo(c))}</span>
         <span className="row-main">
-          <strong>{c.name}</strong>
+          <strong>
+            {c.name}
+            {c.subscriptions.some((s) => s.paid !== true) && (
+              <Coins
+                className="unpaid-inline"
+                size={16}
+                aria-label="Non réglé"
+              />
+            )}
+          </strong>
           <small>
+            {cloud?.profile.role === "admin"
+              ? cloud.ownerLabel(c.id) + " · "
+              : ""}
             {c.subscriptions
               .map((s) => s.provider)
               .filter(Boolean)
@@ -546,8 +697,9 @@ export default function App() {
             <button
               key={n.id}
               className={page === n.id ? "selected" : ""}
+              aria-current={page === n.id ? "page" : undefined}
               onClick={() => {
-                setPage(n.id);
+                navigate(n.id);
                 setQuery("");
               }}
             >
@@ -563,63 +715,105 @@ export default function App() {
           <div className="local-state">
             <span className="status-dot" />
             <span>
-              Coffre local chiffré<small>Aucune donnée dans le cloud</small>
+              {cloud
+                ? "Sauvegarde chiffrée synchronisée"
+                : "Coffre local chiffré"}
+              <small>
+                {cloud
+                  ? "Données rattachées à votre compte"
+                  : "Aucune donnée dans le cloud"}
+              </small>
             </span>
           </div>
-          <button onClick={lock}>
-            <LockKeyhole size={17} />
-            Verrouiller l’espace
-          </button>
           <div className="profile">
             <span className="profile-avatar">M</span>
             <div>
-              Mon espace privé<small>Sur cet appareil</small>
+              {cloud?.profile.display_name || "Mon espace privé"}
+              <small>
+                {cloud
+                  ? cloud.profile.role === "admin"
+                    ? "Administrateur"
+                    : "Sous-revendeur"
+                  : "Sur cet appareil"}
+              </small>
             </div>
             <ShieldCheck size={17} />
           </div>
         </div>
       </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <span className="breadcrumb">
-            Mon espace <ChevronRight size={13} />
-            <strong>{nav.find((n) => n.id === page)?.label}</strong>
-          </span>
-          <span className="desktop-security">
-            <ShieldCheck size={14} /> Espace privé et chiffré
-          </span>
+      <header className="topbar">
+        <span className="app-wordmark">
+          <img src="/scdr-tv-192.png" alt="" width="36" height="36" />
+          SCDR <span>TV</span>
+        </span>
+        <div className="header-actions">
+          {panelSite(vault.provider) ? (
+            <a
+              className="header-panel-link"
+              href={externalBrowserHref(panelSite(vault.provider))}
+              target={
+                externalBrowserHref(panelSite(vault.provider)).startsWith(
+                  "x-safari-",
+                )
+                  ? "_self"
+                  : "_blank"
+              }
+              rel="noopener noreferrer"
+              aria-label="Ouvrir le site du panel"
+            >
+              Panel <ExternalLink size={15} />
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="header-panel-link"
+              aria-label="Configurer le lien du panel"
+              onClick={() => {
+                navigate("settings");
+                requestAnimationFrame(() =>
+                  document.getElementById("panel-site-input")?.focus(),
+                );
+              }}
+            >
+              Panel <ExternalLink size={15} />
+            </button>
+          )}
           <button
-            className="icon-button mobile-lock"
-            onClick={lock}
-            aria-label="Verrouiller"
+            className={
+              "icon-button settings-gear" +
+              (page === "settings" ? " active" : "")
+            }
+            aria-label="Paramètres"
+            aria-pressed={page === "settings"}
+            onClick={() => navigate("settings")}
           >
-            <LockKeyhole size={19} />
+            <Settings size={24} />
           </button>
-        </header>
+        </div>
+      </header>
+      {(page === "dashboard" || page === "clients") && accountHeader}
+      <div className="main-shell" ref={scrollPane}>
+        {accountNotices}
         <main className="content">
           <div className="page-heading">
             <div>
-              <span className="eyebrow">VOTRE PANEL PERSONNEL</span>
               <h1>
                 {page === "dashboard"
-                  ? "Tout est à sa place."
+                  ? "Accueil"
                   : page === "clients"
-                    ? "Votre carnet clients."
-                    : page === "expirations"
-                      ? "Gardez une longueur d’avance."
-                      : "Un espace sous contrôle."}
+                    ? "Clients"
+                    : page === "resellers"
+                      ? "Revendeurs"
+                      : page === "expirations"
+                        ? "Expirations"
+                        : page === "balance"
+                          ? "Bilan"
+                          : page === "media"
+                            ? "Médias"
+                            : "Paramètres"}
               </h1>
-              <p className="subtitle">
-                {page === "dashboard"
-                  ? "Une vue claire sur vos clients et leurs abonnements."
-                  : page === "clients"
-                    ? "Les bonnes informations, toujours à portée de main."
-                    : page === "expirations"
-                      ? "Anticipez les échéances, simplement."
-                      : "Vos données restent les vôtres."}
-              </p>
             </div>
-            {page !== "settings" && (
+            {page === "clients" && (
               <button
                 className="primary"
                 onClick={() => setDialog({ kind: "edit", client: newClient() })}
@@ -632,7 +826,9 @@ export default function App() {
           {!online && (
             <div className="alert">
               <WifiOff size={17} />
-              Vous êtes hors ligne. Votre coffre reste disponible.
+              {cloud
+                ? "Vous êtes hors ligne. Les modifications ne pourront pas être synchronisées avant le retour du réseau."
+                : "Vous êtes hors ligne. Votre coffre reste disponible."}
             </div>
           )}
           {error && (
@@ -655,54 +851,123 @@ export default function App() {
           )}
           {page === "dashboard" && (
             <>
-              <div className="metrics">
-                <Metric
-                  label="Total clients"
-                  value={activeClients.length}
-                  icon={<Users size={18} />}
-                  caption="Dans votre carnet"
-                />
-                <Metric
-                  label="Abonnements actifs"
-                  value={
-                    enabled.filter(
-                      ({ subscription: s }) => daysLeft(s.expires) >= 0,
+              <button
+                type="button"
+                className="activity-card"
+                aria-label="Voir les clients"
+                onClick={() => navigate("clients")}
+              >
+                <div className="activity-card-top">
+                  <span className="activity-number">
+                    {activeClients.length}
+                  </span>
+                  <span className="activity-icon">
+                    <Users size={25} />
+                  </span>
+                </div>
+                <span className="activity-label">Clients</span>
+                <p>
+                  {
+                    activeClients.filter((c) =>
+                      c.subscriptions.some(
+                        (s) =>
+                          s.status === "enabled" && daysLeft(s.expires) >= 0,
+                      ),
                     ).length
-                  }
-                  icon={<ShieldCheck size={18} />}
-                  caption="En cours de validité"
-                />
-                <Metric
-                  label="Sous 7 jours"
-                  value={soon.length}
-                  icon={<Clock3 size={18} />}
-                  caption="À anticiper"
-                  accent
-                />
-                <Metric
-                  label="Abonnements expirés"
+                  }{" "}
+                  avec abonnement en cours <span>·</span>{" "}
+                  {activeClients.length
+                    ? Math.round(
+                        (activeClients.filter((c) =>
+                          c.subscriptions.some(
+                            (s) =>
+                              s.status === "enabled" &&
+                              daysLeft(s.expires) >= 0,
+                          ),
+                        ).length /
+                          activeClients.length) *
+                          100,
+                      )
+                    : 0}
+                  %
+                </p>
+                <progress
+                  aria-label="Part des clients avec abonnement en cours"
+                  max="100"
                   value={
-                    enabled.filter(
-                      ({ subscription: s }) => daysLeft(s.expires) < 0,
-                    ).length
+                    activeClients.length
+                      ? (activeClients.filter((c) =>
+                          c.subscriptions.some(
+                            (s) =>
+                              s.status === "enabled" &&
+                              daysLeft(s.expires) >= 0,
+                          ),
+                        ).length /
+                          activeClients.length) *
+                        100
+                      : 0
                   }
-                  icon={<Archive size={18} />}
-                  caption="À faire le point"
                 />
+              </button>
+              {cloud && <LiveClients clients={activeClients} cloud={cloud} />}
+              <div className="urgency-strip">
+                <button
+                  onClick={() => {
+                    setExpiryFilter("7");
+                    navigate("expirations");
+                  }}
+                >
+                  <span className="urgency-icon">
+                    <Clock3 size={21} />
+                  </span>
+                  <span>
+                    <strong>{soon.length}</strong>
+                    <small>À renouveler</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  onClick={() => {
+                    setExpiryFilter("expired");
+                    navigate("expirations");
+                  }}
+                >
+                  <span className="urgency-icon expired">
+                    <Archive size={21} />
+                  </span>
+                  <span>
+                    <strong>
+                      {
+                        enabled.filter(
+                          ({ subscription: s }) => daysLeft(s.expires) < 0,
+                        ).length
+                      }
+                    </strong>
+                    <small>Expirés</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
               </div>
+              <button
+                className="primary full dashboard-add"
+                onClick={() => setDialog({ kind: "edit", client: newClient() })}
+              >
+                <Plus size={19} />
+                Ajouter un client
+              </button>
               <div className="dashboard-grid">
                 <section className="panel expiry-panel">
                   <div className="section-heading">
                     <div>
                       <h2>
-                        À renouveler bientôt{" "}
+                        À renouveler{" "}
                         <span className="count">{soon.length}</span>
                       </h2>
                       <p>Les échéances des 7 prochains jours.</p>
                     </div>
                     <button
                       className="text-button"
-                      onClick={() => setPage("expirations")}
+                      onClick={() => navigate("expirations")}
                     >
                       Tout voir
                       <ArrowRight size={15} />
@@ -711,9 +976,11 @@ export default function App() {
                   {soon.length ? (
                     soon.slice(0, 4).map(({ client: c, subscription: s }) => (
                       <div className="expiry-row" key={s.id}>
-                        <span className="avatar">{initials(c.name)}</span>
+                        <span className="avatar">
+                          {initials(clientPseudo(c))}
+                        </span>
                         <div className="row-main">
-                          <strong>{c.name}</strong>
+                          <strong>{clientPseudo(c, s)}</strong>
                           <small>
                             {s.provider || "Abonnement"} · {date(s.expires)}
                           </small>
@@ -725,7 +992,7 @@ export default function App() {
                         </span>
                         <button
                           className="icon-button"
-                          aria-label={"Renouveler " + c.name}
+                          aria-label={"Renouveler " + clientPseudo(c, s)}
                           onClick={() =>
                             setDialog({
                               kind: "renew",
@@ -756,78 +1023,7 @@ export default function App() {
                     abonnement(s) arrivent à échéance sous 30 jours
                   </div>
                 </section>
-                <section className="backup-card">
-                  <div className="card-icon">
-                    <ShieldCheck size={24} />
-                  </div>
-                  <span className="eyebrow">L’ESSENTIEL, À L’ABRI</span>
-                  <h2>
-                    Votre tranquillité
-                    <br />a une sauvegarde.
-                  </h2>
-                  <p>
-                    Gardez une copie chiffrée de vos données, indépendante de
-                    tout fournisseur.
-                  </p>
-                  <button onClick={() => setDialog({ kind: "backup" })}>
-                    <Download size={17} />
-                    Créer une sauvegarde
-                    <ArrowUpRight size={17} />
-                  </button>
-                  <small>
-                    {vault.lastBackup
-                      ? "Dernier export : " +
-                        date(vault.lastBackup.slice(0, 10))
-                      : "Aucune sauvegarde exportée pour le moment"}
-                  </small>
-                </section>
               </div>
-              <section className="panel clients-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Derniers clients ajoutés</h2>
-                    <p>Votre carnet, toujours à jour.</p>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => setPage("clients")}
-                  >
-                    Tous les clients
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-                <SearchBox value={query} onChange={setQuery} />
-                {searchClients(activeClients, query)
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                  .slice(0, 5)
-                  .map(clientRow)}
-                {!searchClients(activeClients, query).length && (
-                  <Empty
-                    icon={<Users size={26} />}
-                    title={
-                      query ? "Aucun résultat" : "Votre carnet commence ici"
-                    }
-                    text={
-                      query
-                        ? "Essayez un autre nom, téléphone ou identifiant."
-                        : "Ajoutez votre premier client pour retrouver ses informations ici."
-                    }
-                    action={
-                      !query ? (
-                        <button
-                          className="secondary"
-                          onClick={() =>
-                            setDialog({ kind: "edit", client: newClient() })
-                          }
-                        >
-                          <Plus size={16} />
-                          Ajouter mon premier client
-                        </button>
-                      ) : undefined
-                    }
-                  />
-                )}
-              </section>
             </>
           )}
           {page === "clients" && (
@@ -856,7 +1052,28 @@ export default function App() {
                 </button>
               </div>
               <SearchBox value={query} onChange={setQuery} />
-              {searched.map(clientRow)}
+              {!!searched.length && (
+                <CustomerTable
+                  clients={searched}
+                  panelName={(client, sub) =>
+                    providerPanels(
+                      cloud ? cloud.providerFor(client.id) : vault.provider,
+                    ).find((p) => p.id === sub.panelId)?.name || sub.provider
+                  }
+                  busy={busy}
+                  onOpen={(id) => setDialog({ kind: "detail", id })}
+                  onPaid={(client, sub) =>
+                    void action(() =>
+                      saveClient({
+                        ...client,
+                        subscriptions: client.subscriptions.map((s) =>
+                          s.id === sub.id ? paidSubscription(s, true) : s,
+                        ),
+                      }),
+                    )
+                  }
+                />
+              )}
               {!searched.length && (
                 <Empty
                   icon={<Users size={25} />}
@@ -869,13 +1086,16 @@ export default function App() {
           {page === "expirations" && (
             <section className="panel">
               <div className="section-heading wrap">
-                <h2>Les prochaines échéances</h2>
+                <h2>À prolonger</h2>
                 <select
                   aria-label="Filtrer les échéances"
                   value={expiryFilter}
                   onChange={(e) => setExpiryFilter(e.target.value)}
                 >
                   <option value="7">Sous 7 jours</option>
+                  <option value="followup">
+                    À prolonger · tests et échéances
+                  </option>
                   <option value="30">Sous 30 jours</option>
                   <option value="active">Tous les actifs</option>
                   <option value="expired">Expirés</option>
@@ -885,15 +1105,18 @@ export default function App() {
               {(() => {
                 const items = subscriptions
                   .filter(({ subscription: s }) =>
-                    expiryFilter === "disabled"
-                      ? s.status === "disabled"
-                      : s.status === "enabled" &&
-                        (expiryFilter === "expired"
-                          ? daysLeft(s.expires) < 0
-                          : expiryFilter === "active"
-                            ? daysLeft(s.expires) >= 0
-                            : daysLeft(s.expires) >= 0 &&
-                              daysLeft(s.expires) <= Number(expiryFilter)),
+                    expiryFilter === "followup"
+                      ? s.plan === "trial24" ||
+                        (daysLeft(s.expires) <= 14 && s.status === "enabled")
+                      : expiryFilter === "disabled"
+                        ? s.status === "disabled"
+                        : s.status === "enabled" &&
+                          (expiryFilter === "expired"
+                            ? daysLeft(s.expires) < 0
+                            : expiryFilter === "active"
+                              ? daysLeft(s.expires) >= 0
+                              : daysLeft(s.expires) >= 0 &&
+                                daysLeft(s.expires) <= Number(expiryFilter)),
                   )
                   .sort((a, b) =>
                     a.subscription.expires.localeCompare(
@@ -903,12 +1126,14 @@ export default function App() {
                 return items.length ? (
                   items.map(({ client: c, subscription: s }) => (
                     <div className="expiry-row" key={s.id}>
-                      <span className="avatar">{initials(c.name)}</span>
+                      <span className="avatar">
+                        {initials(clientPseudo(c))}
+                      </span>
                       <button
                         className="row-main plain"
                         onClick={() => setDialog({ kind: "detail", id: c.id })}
                       >
-                        <strong>{c.name}</strong>
+                        <strong>{clientPseudo(c, s)}</strong>
                         <small>
                           {s.provider || "Abonnement"} · {date(s.expires)}
                         </small>
@@ -917,11 +1142,16 @@ export default function App() {
                       <button
                         className="secondary small"
                         onClick={() =>
-                          setDialog({
-                            kind: "renew",
-                            client: c,
-                            subscription: s,
-                          })
+                          setDialog(
+                            cloud && s.panelId && s.type !== "Autre"
+                              ? {
+                                  kind: "provider-action",
+                                  mode: "renew",
+                                  client: c,
+                                  subscription: s,
+                                }
+                              : { kind: "renew", client: c, subscription: s },
+                          )
                         }
                       >
                         <RefreshCw size={14} />
@@ -939,13 +1169,56 @@ export default function App() {
               })()}
             </section>
           )}
+          {page === "resellers" &&
+            (resellersContent || (
+              <section className="panel reseller-manager">
+                <Empty
+                  icon={<Network size={26} />}
+                  title="Votre espace revendeur"
+                  text="Vous gérez votre propre clientèle. La gestion du réseau est réservée aux administrateurs."
+                />
+              </section>
+            ))}
+          {page === "balance" && (
+            <FinancialDashboard
+              clients={vault.clients}
+              panels={providerPanels(vault.provider)}
+            />
+          )}
+          {page === "media" &&
+            (cloud ? (
+              <Suspense fallback={<p>Chargement…</p>}>
+                <MediaLibrary cloud={cloud} />
+              </Suspense>
+            ) : (
+              <p>Connectez-vous à votre compte pour ajouter des publicités.</p>
+            ))}
           {page === "settings" && (
             <div className="settings-grid">
+              {settingsContent}
+              <PanelAccess
+                settings={vault.provider}
+                busy={busy}
+                onSave={async (provider) => {
+                  await commit({ ...vault, provider });
+                }}
+              />
+              {cloud && <Notifications cloud={cloud} />}
               <section className="panel settings-panel">
                 <h2>Sauvegardes & données</h2>
                 <p>
-                  Votre coffre est enregistré uniquement dans ce navigateur.
+                  {cloud
+                    ? "Vos données sont chiffrées sur l’appareil avant leur enregistrement sur votre compte."
+                    : "Votre coffre est enregistré uniquement dans ce navigateur."}
                 </p>
+                {cloud && (
+                  <Setting
+                    icon={<ArrowDownLeft size={19} />}
+                    title="Importer mon ancien coffre local"
+                    text="Récupérez les fiches de ce navigateur sans effacer la copie locale."
+                    onClick={cloud.onLegacyImport}
+                  />
+                )}
                 <Setting
                   icon={<Download size={19} />}
                   title="Exporter une sauvegarde chiffrée"
@@ -965,66 +1238,73 @@ export default function App() {
                   onClick={() => setDialog({ kind: "csv" })}
                 />
                 <div className="alert">
-                  Sur iPhone : enregistrez la sauvegarde dans Fichiers,
-                  idéalement sur un autre support. Effacer Safari, supprimer
-                  l’app ou perdre l’appareil peut supprimer vos données. Le
-                  stockage persistant n’est jamais garanti sur iOS.
+                  {cloud ? (
+                    "Gardez aussi une sauvegarde externe chiffrée. Votre clé de récupération permet de retrouver votre compte et vos clés si vous oubliez votre mot de passe."
+                  ) : (
+                    <>
+                      Sur iPhone : enregistrez la sauvegarde dans Fichiers,
+                      idéalement sur un autre support. Effacer Safari, supprimer
+                      l’app ou perdre l’appareil peut supprimer vos données. Le
+                      stockage persistant n’est jamais garanti sur iOS.
+                    </>
+                  )}
                 </div>
               </section>
               <section className="panel settings-panel">
-                <h2>Sécurité & fournisseur</h2>
+                <h2>Services</h2>
                 <Setting
                   icon={<KeyRound size={19} />}
                   title="Connexion fournisseur"
-                  text="Strong 8K · intégration en préparation"
+                  text="Strong 8K · deux panels et leurs crédits"
                   onClick={() => setDialog({ kind: "provider" })}
                 />
-                <Setting
-                  icon={<LockKeyhole size={19} />}
-                  title="Verrouiller le coffre"
-                  text="Automatique après 5 min d’inactivité ou à la mise en arrière-plan."
-                  onClick={lock}
-                />
-                <div className="security-note">
-                  <ShieldCheck size={22} />
-                  <div>
-                    <strong>Local, par choix.</strong>
-                    <p>
-                      Aucun compte externe. Aucun suivi. Aucune dépendance à un
-                      panel fournisseur.
-                    </p>
-                  </div>
-                </div>
-                <h3>Installer sur votre iPhone</h3>
-                <p>
-                  Ouvrez le site en HTTPS dans Safari, touchez Partager, puis «
-                  Sur l’écran d’accueil ». Après le premier chargement complet,
-                  l’application peut fonctionner hors ligne. Le mode privé
-                  Safari n’est pas recommandé.
-                </p>
-                <p className="fine-print">
-                  Le mot de passe maître n’est pas récupérable. Le chiffrement
-                  protège les données au repos ; un appareil compromis ou un
-                  coffre ouvert restent exposés. Aucun Face ID n’est simulé.
-                </p>
+                {cloud && (
+                  <>
+                    <Setting
+                      icon={<Plus size={19} />}
+                      title="Créer un client avec Strong 8K"
+                      text="Choisir un panel et créer un abonnement réel."
+                      onClick={() =>
+                        setDialog({
+                          kind: "provider-action",
+                          client: { ...newClient(), subscriptions: [] },
+                          mode: "create",
+                        })
+                      }
+                    />
+                    <Setting
+                      icon={<RefreshCw size={19} />}
+                      title="Opérations fournisseur à reprendre"
+                      text="Retrouver les résultats et vérifier les opérations interrompues."
+                      onClick={() => setDialog({ kind: "provider-history" })}
+                    />
+                  </>
+                )}
+                {!cloud && (
+                  <>
+                    <Setting
+                      icon={<LockKeyhole size={19} />}
+                      title="Verrouiller le coffre"
+                      text="Jamais dans l’app · Après 5 minutes en arrière-plan."
+                      onClick={lock}
+                    />
+                  </>
+                )}
               </section>
+              {settingsFooter}
+              <p className="fine-print">SCDR TV · Version {APP_VERSION}</p>
             </div>
           )}
-          <footer className="content-footer">
-            <span>
-              <ShieldCheck size={13} /> Vos données restent sur cet appareil.
-            </span>
-            <span>PRIVÉ · VERSION 0.1</span>
-          </footer>
         </main>
       </div>
-      <nav className="mobile-nav">
+      <nav className="mobile-nav" aria-label="Navigation principale">
         {nav.map((n) => (
           <button
             key={n.id}
             className={page === n.id ? "selected" : ""}
+            aria-current={page === n.id ? "page" : undefined}
             onClick={() => {
-              setPage(n.id);
+              navigate(n.id);
               setQuery("");
             }}
           >
@@ -1052,7 +1332,17 @@ export default function App() {
                         ? "Restaurer une sauvegarde"
                         : dialog.kind === "csv"
                           ? "Importer un fichier CSV"
-                          : "Connexion fournisseur"
+                          : dialog.kind === "provider-history"
+                            ? "Opérations fournisseur à reprendre"
+                            : dialog.kind === "provider-action"
+                              ? dialog.mode === "create"
+                                ? "Créer chez le fournisseur"
+                                : dialog.mode === "renew"
+                                  ? "Renouveler chez le fournisseur"
+                                  : dialog.mode === "status"
+                                    ? "Statut chez le fournisseur"
+                                    : "Consulter le fournisseur"
+                              : "Connexion fournisseur"
           }
           onClose={() => {
             if (!busy) setDialog(null);
@@ -1066,17 +1356,47 @@ export default function App() {
           {dialog.kind === "edit" && (
             <ClientEditor
               client={dialog.client}
+              panels={providerPanels(
+                cloud ? cloud.providerFor(dialog.client.id) : vault.provider,
+              )}
               busy={busy}
               onSave={(c) => action(() => saveClient(c))}
+              onCreateProvider={
+                cloud && !vault.clients.some((c) => c.id === dialog.client.id)
+                  ? (client) =>
+                      setDialog({
+                        kind: "provider-action",
+                        client: { ...client, subscriptions: [] },
+                        mode: "create",
+                      })
+                  : undefined
+              }
             />
           )}
           {dialog.kind === "detail" && current && (
             <>
               <div className="detail-heading">
-                <span className="avatar large">{initials(current.name)}</span>
+                <span className="avatar large">
+                  {initials(clientPseudo(current))}
+                </span>
                 <div>
-                  <h2>{current.name}</h2>
-                  <p>{current.phone || "Téléphone non renseigné"}</p>
+                  <h2
+                    className={panelAccent(
+                      providerPanels(
+                        cloud ? cloud.providerFor(current.id) : vault.provider,
+                      ).find((p) => p.id === current.subscriptions[0]?.panelId)
+                        ?.name ||
+                        current.subscriptions[0]?.provider ||
+                        "",
+                    )}
+                  >
+                    {clientPseudo(current)}
+                  </h2>
+                  <p>
+                    {customerContact(current).value
+                      ? `${customerContact(current).platform} · ${customerContact(current).value}`
+                      : ""}
+                  </p>
                 </div>
                 <button
                   className="icon-button"
@@ -1092,23 +1412,33 @@ export default function App() {
                 </button>
               </div>
               {current.whatsapp && <p>WhatsApp : {current.whatsapp}</p>}
-              {current.notes && <p className="note">{current.notes}</p>}
               {current.subscriptions.map((s) => (
                 <section className="subscription-detail" key={s.id}>
                   <div className="section-heading">
-                    <h3>
-                      {s.provider || "Abonnement"} <small>{s.type}</small>
-                    </h3>
+                    <h3>{s.provider || "Abonnement"}</h3>
                     <Badge subscription={s} />
                   </div>
                   <p className="subscription-dates">
                     Du {date(s.start)} au {date(s.expires)}
                   </p>
+                  {s.panelId && (
+                    <p className="fine-print">
+                      Panel :{" "}
+                      {providerPanels(
+                        cloud ? cloud.providerFor(current.id) : vault.provider,
+                      ).find((p) => p.id === s.panelId)?.name ||
+                        "À réassocier dans la fiche client"}
+                    </p>
+                  )}
+                  {s.providerEnabled === null && (
+                    <p className="fine-print">
+                      État du panel : non communiqué.
+                    </p>
+                  )}
                   {[
-                    ["Identifiant", s.username],
+                    ["Pseudo", clientPseudo(current, s)],
                     ["Mot de passe", s.password],
-                    ["Serveur", s.server],
-                    ...(s.m3u ? [["Lien M3U", s.m3u]] : []),
+                    ["Lien du serveur", serverAddress(s)],
                     ...(s.mac ? [["Adresse MAC", s.mac]] : []),
                   ].map(([label, value]) => (
                     <Secret
@@ -1123,17 +1453,80 @@ export default function App() {
                       Vente : {s.sale || "—"} € · Achat : {s.cost || "—"} €
                     </p>
                   )}
-                  {s.notes && <p className="note">{s.notes}</p>}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() =>
+                      void action(() =>
+                        saveClient({
+                          ...current,
+                          subscriptions: current.subscriptions.map((v) =>
+                            v.id === s.id
+                              ? paidSubscription(v, v.paid !== true)
+                              : v,
+                          ),
+                        }),
+                      )
+                    }
+                  >
+                    {s.paid === true
+                      ? "Marquer comme non réglé"
+                      : "Marquer comme réglé"}
+                  </button>
                   <div className="button-row">
+                    {cloud && s.panelId && s.type !== "Autre" && (
+                      <>
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            setDialog({
+                              kind: "provider-action",
+                              client: current,
+                              subscription: s,
+                              mode: "inspect",
+                            })
+                          }
+                        >
+                          Actualiser depuis le panel
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            setDialog({
+                              kind: "provider-action",
+                              client: current,
+                              subscription: s,
+                              mode: "status",
+                            })
+                          }
+                        >
+                          {s.status === "disabled"
+                            ? "Activer chez le fournisseur"
+                            : "Suspendre chez le fournisseur"}
+                        </button>
+                      </>
+                    )}
                     <button
                       className="secondary"
                       disabled={busy}
                       onClick={() =>
-                        setDialog({
-                          kind: "renew",
-                          client: current,
-                          subscription: s,
-                        })
+                        setDialog(
+                          cloud && s.panelId && s.type !== "Autre"
+                            ? {
+                                kind: "provider-action",
+                                client: current,
+                                subscription: s,
+                                mode: "renew",
+                              }
+                            : {
+                                kind: "renew",
+                                client: current,
+                                subscription: s,
+                              },
+                        )
                       }
                     >
                       <RefreshCw size={15} />
@@ -1168,7 +1561,25 @@ export default function App() {
                   )}
                 </section>
               ))}
+              {clientNotes(current) && (
+                <p className="note">{clientNotes(current)}</p>
+              )}
               <div className="button-row detail-actions">
+                {cloud && (
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() =>
+                      setDialog({
+                        kind: "provider-action",
+                        client: current,
+                        mode: "create",
+                      })
+                    }
+                  >
+                    Créer un abonnement Strong 8K
+                  </button>
+                )}
                 <button
                   className="secondary"
                   disabled={busy}
@@ -1188,31 +1599,33 @@ export default function App() {
                   <Archive size={15} />
                   {current.archived ? "Désarchiver" : "Archiver"}
                 </button>
-                <button
-                  className="danger"
-                  disabled={busy}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Supprimer définitivement " +
-                          current.name +
-                          " et ses abonnements ? Cette action est irréversible.",
+                {(!cloud || cloud.profile.role === "admin") && (
+                  <button
+                    className="danger"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          "Supprimer définitivement " +
+                            current.name +
+                            " et ses abonnements ? Cette action est irréversible.",
+                        )
                       )
-                    )
-                      action(async () => {
-                        await commit({
-                          ...vault,
-                          clients: vault.clients.filter(
-                            (c) => c.id !== current.id,
-                          ),
+                        action(async () => {
+                          await commit({
+                            ...vault,
+                            clients: vault.clients.filter(
+                              (c) => c.id !== current.id,
+                            ),
+                          });
+                          setDialog(null);
                         });
-                        setDialog(null);
-                      });
-                  }}
-                >
-                  <Trash2 size={15} />
-                  Supprimer
-                </button>
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    Supprimer
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -1220,9 +1633,20 @@ export default function App() {
             <RenewalForm
               subscription={dialog.subscription}
               busy={busy}
-              onRenew={(next) =>
+              panel={providerPanels(
+                cloud ? cloud.providerFor(dialog.client.id) : vault.provider,
+              ).find((p) => p.id === dialog.subscription.panelId)}
+              onRenew={(next, sale, cost, plan) =>
                 action(async () => {
-                  const updated = renew(dialog.subscription, next);
+                  const updated = {
+                    ...renew(dialog.subscription, next),
+                    sale,
+                    cost,
+                    plan,
+                    paid: false,
+                    expiresAt: undefined,
+                    trialStartedAt: undefined,
+                  };
                   await saveClient({
                     ...dialog.client,
                     subscriptions: dialog.client.subscriptions.map((s) =>
@@ -1302,9 +1726,67 @@ export default function App() {
             <ProviderForm
               value={vault.provider}
               busy={busy}
+              onlineAccount={!!cloud}
               onSave={async (provider) => {
                 await commit({ ...vault, provider });
                 setDialog(null);
+                setNotice(
+                  "Paramètres fournisseur enregistrés dans votre coffre chiffré.",
+                );
+              }}
+            />
+          )}
+          {dialog.kind === "provider-action" && cloud && (
+            <ProviderWorkflow
+              key={
+                dialog.operation?.id ||
+                `${dialog.client.id}:${dialog.subscription?.id || "new"}:${dialog.mode}`
+              }
+              cloud={cloud}
+              client={dialog.client}
+              subscription={dialog.subscription}
+              mode={dialog.mode}
+              panels={providerPanels(cloud.providerFor(dialog.client.id))}
+              initialOperation={dialog.operation}
+              initialContext={dialog.context}
+              onApply={async (client) => {
+                await commit({
+                  ...vault,
+                  clients: vault.clients.some((c) => c.id === client.id)
+                    ? vault.clients.map((c) =>
+                        c.id === client.id ? client : c,
+                      )
+                    : [client, ...vault.clients],
+                });
+              }}
+              onFinish={() => {
+                setDialog(null);
+                setNotice(
+                  "Résultat fournisseur enregistré. Aucune action distante n’a été répétée.",
+                );
+              }}
+            />
+          )}
+          {dialog.kind === "provider-history" && cloud && (
+            <ProviderHistory
+              cloud={cloud}
+              onResume={(captured, context, operation) => {
+                const current =
+                  vault.clients.find((c) => c.id === captured.id) || captured;
+                setDialog({
+                  kind: "provider-action",
+                  client: current,
+                  subscription:
+                    current.subscriptions.find(
+                      (s) => s.id === context.subscriptionId,
+                    ) ||
+                    captured.subscriptions.find(
+                      (s) => s.id === context.subscriptionId,
+                    ),
+                  mode: context.mode,
+                  operation,
+                  context,
+                });
               }}
             />
           )}
@@ -1373,7 +1855,15 @@ function SearchBox({
       <Search size={17} />
       <input
         aria-label="Rechercher des clients"
-        placeholder="Rechercher un nom, téléphone, fournisseur, identifiant…"
+        inputMode="search"
+        enterKeyHint="search"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        placeholder="Rechercher un pseudo…"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -1385,7 +1875,7 @@ function SearchBox({
     </label>
   );
 }
-function Setting({
+export function Setting({
   icon,
   title,
   text,
@@ -1410,14 +1900,40 @@ function Setting({
 
 function ClientEditor({
   client,
+  panels,
   busy,
   onSave,
+  onCreateProvider,
 }: {
   client: Client;
+  panels: ProviderPanel[];
   busy: boolean;
   onSave: (c: Client) => void;
+  onCreateProvider?: (c: Client) => void;
 }) {
-  const [draft, setDraft] = useState(() => structuredClone(client));
+  const [draft, setDraft] = useState(() => {
+    const value = structuredClone(client);
+    value.name = clientPseudo(client);
+    value.notes = clientNotes(client);
+    value.subscriptions = value.subscriptions.map((sub, i) => {
+      const next = sub.expires ? sub : applyPlan(sub, "year1");
+      return {
+        ...next,
+        username: i === 0 ? value.name : sub.username,
+        server: serverAddress(sub),
+        notes: "",
+        cost:
+          sub.cost ||
+          (sub.plan === "trial24"
+            ? "0"
+            : panelCost(
+                panels.find((p) => p.id === sub.panelId),
+                planMonths(planOf(next)) || 12,
+              )),
+      };
+    });
+    return value;
+  });
   const [problem, setProblem] = useState("");
   const set = (key: keyof Client, value: string) =>
     setDraft({ ...draft, [key]: value });
@@ -1429,12 +1945,34 @@ function ClientEditor({
       ),
     });
   }
+  const contact = customerContact(draft);
+  function setContact(
+    platform: (typeof contactPlatforms)[number],
+    value: string,
+  ) {
+    setDraft({
+      ...draft,
+      contact: { platform, value },
+      ...(platform === "Téléphone"
+        ? { phone: value }
+        : platform === "WhatsApp"
+          ? { whatsapp: value }
+          : {}),
+    });
+  }
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         try {
-          const c = { ...draft, name: draft.name.trim() };
+          const c = {
+            ...draft,
+            name: draft.name.trim(),
+            subscriptions: draft.subscriptions.map((s) => ({
+              ...s,
+              server: normalizeWebAddress(s.server),
+            })),
+          };
           validateVault({ ...emptyVault(), clients: [c] });
           setProblem("");
           onSave(c);
@@ -1445,82 +1983,143 @@ function ClientEditor({
     >
       <div className="form-grid">
         <Field
-          label="Nom ou pseudonyme *"
+          label="Pseudo *"
           required
           maxLength={200}
           value={draft.name}
-          onChange={(e) => set("name", e.target.value)}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              name: e.target.value,
+              subscriptions: draft.subscriptions.map((v, i) =>
+                i === 0 ? { ...v, username: e.target.value } : v,
+              ),
+            })
+          }
           autoComplete="off"
         />
+        <label className="field">
+          <span>Plateforme de contact</span>
+          <select
+            aria-label="Plateforme de contact"
+            value={contact.platform}
+            onChange={(e) =>
+              setContact(
+                e.target.value as (typeof contactPlatforms)[number],
+                contact.value,
+              )
+            }
+          >
+            {contactPlatforms.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
         <Field
-          label="Téléphone"
-          type="tel"
-          value={draft.phone}
-          onChange={(e) => set("phone", e.target.value)}
-        />
-        <Field
-          label="WhatsApp (facultatif)"
-          type="tel"
-          value={draft.whatsapp}
-          onChange={(e) => set("whatsapp", e.target.value)}
+          label="Contact"
+          value={contact.value}
+          onChange={(e) => setContact(contact.platform, e.target.value)}
+          placeholder={
+            contact.platform === "Téléphone" || contact.platform === "WhatsApp"
+              ? "+33…"
+              : "Pseudo ou coordonnées"
+          }
         />
       </div>
       <label className="field">
-        <span>Notes client</span>
+        <span>Notes</span>
         <textarea
+          aria-label="Notes"
           value={draft.notes}
           onChange={(e) => set("notes", e.target.value)}
         />
       </label>
+      {onCreateProvider && (
+        <button
+          type="button"
+          className="secondary full"
+          disabled={busy}
+          onClick={() => onCreateProvider(draft)}
+        >
+          Créer l’abonnement dans un panel Strong 8K
+        </button>
+      )}
       {draft.subscriptions.map((s, i) => (
         <fieldset key={s.id}>
           <legend>Abonnement {i + 1}</legend>
           <div className="form-grid">
-            <Field
-              label="Fournisseur"
-              value={s.provider}
-              onChange={(e) => sub(s.id, "provider", e.target.value)}
-            />
             <label className="field">
-              <span>Type de connexion</span>
+              <span>Panel Strong 8K</span>
               <select
-                value={s.type}
-                onChange={(e) => sub(s.id, "type", e.target.value)}
+                value={s.panelId || ""}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const calculated = panelCost(
+                    panels.find((p) => p.id === id),
+                    s.plan === "month1"
+                      ? 1
+                      : s.plan === "month3"
+                        ? 3
+                        : s.plan === "month6"
+                          ? 6
+                          : 12,
+                  );
+                  setDraft({
+                    ...draft,
+                    subscriptions: draft.subscriptions.map((v) =>
+                      v.id === s.id
+                        ? {
+                            ...v,
+                            panelId: id,
+                            provider:
+                              panels.find((p) => p.id === id)?.name ||
+                              v.provider,
+                            cost: s.plan === "trial24" ? "0" : calculated,
+                          }
+                        : v,
+                    ),
+                  });
+                }}
               >
-                <option>M3U</option>
-                <option>MAG</option>
-                <option>Autre</option>
+                <option value="">Non renseigné</option>
+                {s.panelId && !panels.some((p) => p.id === s.panelId) && (
+                  <option value={s.panelId}>Panel à réassocier</option>
+                )}
+                {panels.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Application utilisée</span>
+              <select
+                aria-label="Application utilisée"
+                value={s.player || ""}
+                onChange={(e) => sub(s.id, "player", e.target.value)}
+              >
+                <option value="">Choisir…</option>
+                <option>Tivimate</option>
+                <option>Smarters Player</option>
+                <option>IBO Player</option>
               </select>
             </label>
             <Field
-              label="Identifiant"
-              autoComplete="off"
-              value={s.username}
-              onChange={(e) => sub(s.id, "username", e.target.value)}
-            />
-            <Field
               label="Mot de passe"
-              type="password"
-              autoComplete="new-password"
+              type="text"
+              autoComplete="off"
               value={s.password}
               onChange={(e) => sub(s.id, "password", e.target.value)}
             />
             <Field
-              label="URL du serveur"
-              type="url"
+              label="Lien du serveur"
+              type="text"
+              inputMode="url"
               placeholder="https://…"
               value={s.server}
               onChange={(e) => sub(s.id, "server", e.target.value)}
             />
-            {s.type === "M3U" && (
-              <Field
-                label="Lien M3U complet"
-                type="password"
-                autoComplete="off"
-                value={s.m3u}
-                onChange={(e) => sub(s.id, "m3u", e.target.value)}
-              />
-            )}
             {s.type === "MAG" && (
               <Field
                 label="Adresse MAC"
@@ -1535,37 +2134,108 @@ function ClientEditor({
               type="date"
               required
               value={s.start}
-              onChange={(e) => sub(s.id, "start", e.target.value)}
+              readOnly={s.plan === "trial24"}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  subscriptions: draft.subscriptions.map((v) =>
+                    v.id === s.id
+                      ? applyPlan({ ...v, start: e.target.value }, planOf(v))
+                      : v,
+                  ),
+                })
+              }
             />
             <label className="field">
-              <span>Calculer l’expiration</span>
+              <span>Durée de l’abonnement</span>
               <select
                 aria-label="Durée de l’abonnement"
-                defaultValue=""
+                value={
+                  s.plan === "trial24"
+                    ? "trial24"
+                    : s.plan === "year1"
+                      ? "12"
+                      : s.plan === "month6"
+                        ? "6"
+                        : s.plan === "month3"
+                          ? "3"
+                          : s.plan === "month1"
+                            ? "1"
+                            : ""
+                }
                 onChange={(e) => {
-                  if (e.target.value) {
-                    sub(
-                      s.id,
-                      "expires",
-                      addMonths(s.start, Number(e.target.value)),
-                    );
-                    e.target.value = "";
-                  }
+                  const plan: Plan =
+                    e.target.value === "trial24"
+                      ? "trial24"
+                      : e.target.value === "12"
+                        ? "year1"
+                        : e.target.value === "6"
+                          ? "month6"
+                          : e.target.value === "3"
+                            ? "month3"
+                            : e.target.value === "1"
+                              ? "month1"
+                              : "custom";
+                  const updated = applyPlan(s, plan);
+                  if (plan === "trial24") {
+                    updated.sale ||= "0";
+                    updated.cost ||= "0";
+                  } else if (e.target.value)
+                    updated.cost =
+                      panelCost(
+                        panels.find((p) => p.id === s.panelId),
+                        Number(e.target.value),
+                      ) || s.cost;
+                  setDraft({
+                    ...draft,
+                    subscriptions: draft.subscriptions.map((v) =>
+                      v.id === s.id ? updated : v,
+                    ),
+                  });
                 }}
               >
-                <option value="">Choisir une durée…</option>
+                <option value="">Personnalisée</option>
+                <option value="trial24">Test 24 h</option>
                 <option value="1">1 mois</option>
                 <option value="3">3 mois</option>
                 <option value="6">6 mois</option>
                 <option value="12">12 mois</option>
               </select>
             </label>
+            {s.plan === "trial24" && (
+              <Field
+                label="Début du test 24 h"
+                type="datetime-local"
+                value={
+                  s.trialStartedAt
+                    ? new Date(
+                        Date.parse(s.trialStartedAt) -
+                          new Date(s.trialStartedAt).getTimezoneOffset() *
+                            60000,
+                      )
+                        .toISOString()
+                        .slice(0, 16)
+                    : ""
+                }
+                onChange={(e) => {
+                  const instant = new Date(e.target.value);
+                  if (Number.isFinite(+instant))
+                    setDraft({
+                      ...draft,
+                      subscriptions: draft.subscriptions.map((v) =>
+                        v.id === s.id ? applyPlan(v, "trial24", instant) : v,
+                      ),
+                    });
+                }}
+              />
+            )}
             <Field
               label="Date d’expiration *"
               type="date"
               required
               min={s.start}
               value={s.expires}
+              readOnly={s.plan === "trial24"}
               onChange={(e) => sub(s.id, "expires", e.target.value)}
             />
             <Field
@@ -1582,6 +2252,7 @@ function ClientEditor({
               min="0"
               step="0.01"
               value={s.cost}
+              readOnly={!!panels.find((p) => p.id === s.panelId)?.annualCost}
               onChange={(e) => sub(s.id, "cost", e.target.value)}
             />
             <label className="field">
@@ -1595,13 +2266,6 @@ function ClientEditor({
               </select>
             </label>
           </div>
-          <label className="field">
-            <span>Notes abonnement</span>
-            <textarea
-              value={s.notes}
-              onChange={(e) => sub(s.id, "notes", e.target.value)}
-            />
-          </label>
           <button
             className="text-button danger-text"
             type="button"
@@ -1623,19 +2287,6 @@ function ClientEditor({
           </button>
         </fieldset>
       ))}
-      <button
-        className="secondary full"
-        type="button"
-        onClick={() =>
-          setDraft({
-            ...draft,
-            subscriptions: [...draft.subscriptions, newSubscription()],
-          })
-        }
-      >
-        <Plus size={16} />
-        Ajouter un abonnement
-      </button>
       {problem && (
         <p role="alert" className="alert error">
           {problem}
@@ -1652,17 +2303,27 @@ function RenewalForm({
   subscription,
   busy,
   onRenew,
+  panel,
 }: {
   subscription: Subscription;
   busy: boolean;
-  onRenew: (next: string) => void;
+  onRenew: (next: string, sale: string, cost: string, plan: Plan) => void;
+  panel?: ProviderPanel;
 }) {
-  const [next, setNext] = useState("");
+  const [next, setNext] = useState(
+    addMonths(
+      subscription.expires > today() ? subscription.expires : today(),
+      12,
+    ),
+  );
+  const [plan, setPlan] = useState<Plan>("year1"),
+    [sale, setSale] = useState(subscription.sale),
+    [cost, setCost] = useState(panelCost(panel) || subscription.cost);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onRenew(next);
+        onRenew(next, sale, cost, plan);
       }}
     >
       <p>
@@ -1678,11 +2339,58 @@ function RenewalForm({
       />
       <p className="alert">
         <CircleHelp size={18} />
+        Cette action met à jour le suivi. Le renouvellement chez le fournisseur
+        se fait depuis la fiche liée à son panel.
+      </p>
+      <label className="field">
+        <span>Durée de prolongation</span>
+        <select
+          aria-label="Durée de prolongation"
+          value={plan}
+          onChange={(e) => {
+            const p = e.target.value as Plan;
+            setPlan(p);
+            const months =
+              p === "year1" ? 12 : p === "month6" ? 6 : p === "month3" ? 3 : 1;
+            setNext(
+              addMonths(
+                subscription.expires > today() ? subscription.expires : today(),
+                months,
+              ),
+            );
+            setCost(panelCost(panel, months) || subscription.cost);
+          }}
+        >
+          <option value="month1">1 mois</option>
+          <option value="month3">3 mois</option>
+          <option value="month6">6 mois</option>
+          <option value="year1">1 an</option>
+        </select>
+      </label>
+      <Field
+        label="Prix de vente (€)"
+        type="number"
+        min="0"
+        step="0.01"
+        required
+        value={sale}
+        onChange={(e) => setSale(e.target.value)}
+      />
+      <Field
+        label="Prix d’achat (€)"
+        type="number"
+        min="0"
+        step="0.01"
+        required
+        value={cost}
+        onChange={(e) => setCost(e.target.value)}
+      />
+      <p className="sr-only">
         Cette action met à jour votre suivi local uniquement. Elle ne renouvelle
         rien chez le fournisseur et ne réactive pas un abonnement suspendu.
       </p>
       <button className="primary full" disabled={busy}>
-        Confirmer le renouvellement local
+        Enregistrer le renouvellement
       </button>
     </form>
   );
@@ -2143,62 +2851,225 @@ function CsvImport({
 function ProviderForm({
   value,
   busy,
+  onlineAccount,
   onSave,
 }: {
   value: Vault["provider"];
   busy: boolean;
+  onlineAccount: boolean;
   onSave: (v: Vault["provider"]) => Promise<void>;
 }) {
-  const [url, setUrl] = useState(value.url),
-    [key, setKey] = useState(value.key),
-    [error, setError] = useState("");
+  const [panels, setPanels] = useState<ProviderPanel[]>(() => {
+      const saved = providerPanels(value).map((p) => ({ ...p }));
+      while (saved.length < 2)
+        saved.push({
+          id: crypto.randomUUID(),
+          name: `Panel ${saved.length + 1}`,
+          key: "",
+        });
+      return saved;
+    }),
+    [selected, setSelected] = useState(0),
+    [error, setError] = useState(""),
+    [testing, setTesting] = useState(false),
+    [saving, setSaving] = useState(false),
+    [accounts, setAccounts] = useState<
+      Record<string, ProviderAccount | undefined>
+    >({});
+  const panel = panels[selected];
+  const key = panel.key;
+  const account = accounts[panel.id];
+  function editPanel(
+    field: "name" | "key" | "annualCost" | "dashboardUrl",
+    text: string,
+  ) {
+    setPanels(
+      panels.map((p) => (p.id === panel.id ? { ...p, [field]: text } : p)),
+    );
+    if (field === "key") setAccounts({ ...accounts, [panel.id]: undefined });
+    setError("");
+  }
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault();
         try {
-          if (url && new URL(url).protocol !== "https:")
-            throw new Error("Une adresse HTTPS est obligatoire.");
-          await onSave({ url, key });
+          if (busy || testing || saving) return;
+          setError("");
+          setSaving(true);
+          const next = panels.map((p) => ({
+            ...p,
+            name: p.name.trim(),
+            key: p.key.trim() ? normalizeProviderKey(p.key) : "",
+          }));
+          if (next.some((p) => !p.name))
+            throw new Error("Donnez un nom à chacun des deux panels.");
+          if (
+            next[0].name.toLocaleLowerCase() ===
+            next[1].name.toLocaleLowerCase()
+          )
+            throw new Error(
+              "Choisissez deux noms différents pour distinguer vos panels.",
+            );
+          if (next[0].key && next[0].key === next[1].key)
+            throw new Error(
+              "Les deux panels ont la même clé. Vérifiez la clé du second fournisseur.",
+            );
+          if (next.some((p) => /\s/.test(p.key)))
+            throw new Error("Une clé API ne doit pas contenir d’espace.");
+          if (
+            next.some(
+              (p) =>
+                p.annualCost !== undefined &&
+                p.annualCost !== "" &&
+                (!Number.isFinite(Number(p.annualCost)) ||
+                  Number(p.annualCost) < 0),
+            )
+          )
+            throw new Error("Vérifiez le prix d’achat de chaque panel.");
+          if (
+            next.some(
+              (p) => p.dashboardUrl && !/^https?:\/\//i.test(p.dashboardUrl),
+            )
+          )
+            throw new Error(
+              "Le lien du panel doit commencer par https:// ou http://.",
+            );
+          await onSave({
+            ...value,
+            url: PROVIDER_URL,
+            key: next[0].key,
+            panels: next,
+          });
         } catch (e) {
           setError((e as Error).message);
+        } finally {
+          setSaving(false);
         }
       }}
     >
-      <p>
-        Les paramètres sont conservés dans votre coffre chiffré, jamais dans le
-        code source.
-      </p>
+      <p>Deux fournisseurs Strong 8K, deux clés et deux soldes distincts.</p>
+      <label className="field">
+        <span>Panel à configurer</span>
+        <select
+          value={selected}
+          disabled={busy || testing || saving}
+          onChange={(e) => {
+            setSelected(Number(e.target.value));
+            setError("");
+          }}
+        >
+          {panels.map((p, i) => (
+            <option key={p.id} value={i}>
+              {p.name || `Panel ${i + 1}`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Field
+        label="Nom du panel"
+        value={panel.name}
+        maxLength={80}
+        required
+        disabled={busy || testing || saving}
+        onChange={(e) => editPanel("name", e.target.value)}
+      />
       <Field
         label="Adresse HTTPS de l’API"
         type="url"
-        placeholder="https://…"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
+        value={PROVIDER_URL}
+        readOnly
+      />
+      <Field
+        label="Prix d’achat annuel (€)"
+        type="number"
+        min="0"
+        step="0.01"
+        value={panel.annualCost || ""}
+        disabled={busy || testing || saving}
+        onChange={(e) => editPanel("annualCost", e.target.value)}
       />
       <Field
         label="Clé API personnelle"
         type="password"
+        maxLength={4096}
+        placeholder="Clé API seule ou lien API complet"
+        disabled={busy || testing || saving}
         autoComplete="new-password"
         value={key}
-        onChange={(e) => setKey(e.target.value)}
+        onChange={(e) => {
+          editPanel("key", e.target.value);
+        }}
       />
       <div className="alert">
-        {providerAvailability.reason} Les consultations du compte et des
-        abonnements seront disponibles après validation de cette documentation.
-        La création, le renouvellement et le changement de statut distants
-        restent désactivés.
+        Ce test consulte uniquement le compte et les crédits du panel
+        sélectionné. Aucun abonnement n’est créé ou renouvelé. Cette API ne
+        fournit pas la liste de vos clients.
       </div>
-      <button type="button" className="secondary full" disabled>
-        Tester la connexion — documentation requise
+      <p className="muted">
+        La clé transite en HTTPS par notre serveur vers le fournisseur pour le
+        test. Elle est conservée dans votre coffre chiffré uniquement si vous
+        l’enregistrez.
+      </p>
+      {!onlineAccount && (
+        <p role="alert" className="alert">
+          Connectez-vous à votre compte SCDR TV pour tester l’API.
+        </p>
+      )}
+      <button
+        type="button"
+        className="secondary full"
+        disabled={!onlineAccount || !key.trim() || busy || testing || saving}
+        onClick={async () => {
+          setError("");
+          setAccounts({ ...accounts, [panel.id]: undefined });
+          setTesting(true);
+          try {
+            const result = await testProviderConnection(key.trim());
+            setAccounts((previous) => ({ ...previous, [panel.id]: result }));
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setTesting(false);
+          }
+        }}
+      >
+        {testing ? "Connexion au fournisseur…" : "Tester la connexion"}
       </button>
+      {account && (
+        <div role="status" className="alert">
+          <strong>Connexion réussie</strong>
+          <br />
+          Panel : {panel.name}
+          <br />
+          Compte : {account.name || "Non communiqué"}
+          <br />
+          Crédits :{" "}
+          {account.credits === null
+            ? "Non communiqués"
+            : new Intl.NumberFormat("fr-FR", {
+                maximumFractionDigits: 4,
+              }).format(account.credits)}
+          <br />
+          {account.enabled === null
+            ? "État du compte : non communiqué"
+            : account.enabled
+              ? "Compte fournisseur actif"
+              : "Compte fournisseur désactivé : contactez le fournisseur."}
+        </div>
+      )}
       {error && (
         <p role="alert" className="alert error">
           {error}
         </p>
       )}
-      <button className="primary full form-submit" disabled={busy}>
-        Enregistrer les paramètres localement
+      <button
+        className="primary full form-submit"
+        disabled={
+          busy || testing || saving || !panels.some((p) => p.key.trim())
+        }
+      >
+        {saving ? "Enregistrement…" : "Enregistrer les deux panels"}
       </button>
     </form>
   );

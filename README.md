@@ -1,72 +1,191 @@
-# Privé — App-TV
+# SCDR TV — comptes et clientèles chiffrées
 
-Panel personnel de clients et d’abonnements, en français, pour iPhone. React, TypeScript et Vite ; aucun serveur de données, compte externe, outil de suivi ou diffusion de flux.
+Gestion de clients et d’abonnements en français, sur mobile et ordinateur.
+React 19, TypeScript, Vite, fonctions Vercel et Supabase Auth/Postgres.
+Production : https://app-tv-alpha.vercel.app
+Projet Supabase : `woldrkevualjtdzsbcwn` (App tv, eu-west-1).
 
-## Démarrer
+## Comptes et autorisations
 
-Prérequis : Node.js 22.12+ ou 24 et npm.
+Deux associés disposent de comptes administrateurs personnels. Chaque administrateur
+voit toutes les clientèles et peut ajouter des sous-revendeurs depuis **Revendeurs**.
+Le sous-revendeur peut consulter, ajouter, modifier et renouveler ses propres clients.
+Les invitations sont liées à une adresse email, utilisables une seule fois et expirent
+après sept jours. Le lien se transmet manuellement au destinataire ; aucun envoi
+commercial ou automatique n’est intégré.
 
-```sh
-cd /workspace/App-TV
-npm ci
-npm run dev
-```
+Les droits sont appliqués dans Postgres avec RLS. Un sous-revendeur ne peut pas
+s’attribuer un rôle administrateur, changer le propriétaire d’un coffre, ni accéder
+au coffre d’un autre revendeur. Les rôles et l’activation sont vérifiés en base ;
+suspendre un sous-revendeur bloque immédiatement ses prochaines requêtes même si
+son JWT n’est pas encore expiré. Les données déjà affichées ou exportées ne peuvent
+pas être reprises à distance.
 
-Pour un hébergement réel, exécuter `npm run build` et servir **le contenu de `dist/` à la racine d’un site HTTPS dédié**. Ne pas exposer le serveur Vite de développement sur Internet. Les données de chaque origine (protocole, domaine et port) sont distinctes : exporter avant de changer de domaine. Ne pas partager l’origine avec une application non fiable.
+Le sélecteur **Clientèle** permet aux administrateurs d’afficher leur clientèle,
+celle d’un revendeur ou l’ensemble. Dans la vue globale, un nouveau client est
+rattaché à l’administrateur connecté ; sélectionner un revendeur pour créer une
+fiche dans sa clientèle. La suspension concerne les comptes de revendeurs ;
+les comptes administrateurs sont protégés de cette action.
 
-Pour vérifier la version de production en local :
+## Confidentialité
 
-```sh
-npm run build
-npm run preview
-```
+Le contenu de chaque clientèle, y compris les informations de connexion et les
+paramètres fournisseur, est chiffré **sur l’appareil avant envoi**. Chaque écriture
+utilise une nouvelle clé AES-256-GCM et un nouvel IV. La clé AES est enveloppée
+avec RSA-OAEP/SHA-256 pour le propriétaire et chacun des administrateurs actifs.
+L’identité et la révision du coffre sont authentifiées avec les données. Le serveur
+connaît les comptes, les rôles, l’attribution des coffres, leur taille et les dates
+d’enregistrement, mais ne reçoit pas les fiches en clair.
 
-Le service worker est activé en production seulement. Il conserve uniquement les fichiers statiques ; aucune donnée client n’entre dans Cache Storage. Après le premier chargement complet, attendre son installation avant de couper le réseau. Les mises à jour s’activent après fermeture des anciens onglets.
+Chaque compte possède une paire RSA de 3072 bits. Sa clé privée est chiffrée avec
+PBKDF2/SHA-256 à 600 000 itérations et AES-GCM. Une copie est protégée par une clé
+de récupération aléatoire de 256 bits. Le mot de passe saisi reste sur l’appareil ;
+un identifiant cryptographique distinct, dérivé du mot de passe et de l’email, est
+utilisé auprès de Supabase Auth. Les identifiants, mots de passe clients et serveurs sont visibles dans les fiches
+déverrouillées et copiables, conformément au choix validé. Les mots de passe
+d’authentification et les clés API restent masqués.
 
-## Sur iPhone
+Lors de l’activation, télécharger la clé de récupération et la conserver hors de
+l’appareil. La récupération utilise cette clé pour ouvrir l’identité d’origine et
+la protéger avec un nouveau mot de passe. Seule une preuve dérivée, et non la clé
+elle-même, est transmise au serveur. Sans mot de passe, clé de récupération ou
+sauvegarde exploitable, il n’existe pas de récupération magique des données.
+Les deux administrateurs doivent terminer l’activation initiale avant les premières
+écritures, afin que les coffres puissent être chiffrés pour les deux associés.
 
-1. Ouvrir l’application hébergée en HTTPS dans Safari.
-2. Créer un mot de passe maître d’au moins 12 caractères et le conserver en lieu sûr.
-3. Menu Partager → Sur l’écran d’accueil.
-4. Ajouter une fiche et exporter immédiatement une sauvegarde depuis Paramètres.
+Les sessions sont conservées dans un cookie `HttpOnly`, `Secure` en production,
+`SameSite=Lax`, sans jetons accessibles au JavaScript du navigateur. Les écritures
+vérifient aussi l’origine de la requête. Les routes API sont exclues du service
+worker et répondent `Cache-Control: private, no-store`. Les clés privées
+utilisées pour le déchiffrement restent non exportables et en mémoire.
+Le coffre reste ouvert sans limite au premier plan et se verrouille après cinq
+minutes consécutives en arrière-plan. Le retour avant ce délai l’annule. Le temps
+écoulé est aussi vérifié au retour si iOS a suspendu les timers. La session de
+compte reste distincte du verrouillage des données.
 
-**Le stockage Safari n’est pas une sauvegarde.** iOS peut supprimer des données locales. Effacer les données du site, supprimer l’application, perdre ou casser le téléphone peut entraîner une perte. Conserver des exports chiffrés sur un autre appareil ou support. Une demande de stockage persistant est effectuée, sans garantie d’acceptation. Éviter la navigation privée. Safari et la PWA installée peuvent présenter des espaces de stockage différents : vérifier les données et utiliser l’export/restauration pour les transférer.
+Le chiffrement ne protège pas un appareil compromis, une application servie avec
+un script malveillant, une personne utilisant un compte déjà ouvert ou un partage
+volontaire. Cette implémentation n’a pas fait l’objet d’un audit indépendant.
 
-## Utilisation
+## Sauvegarde et ancien coffre
 
-- Tableau de bord : clients non archivés, abonnements actifs, expirés, sous 7 et sous 30 jours. Le jour d’expiration est inclus dans la validité ; les statuts sont recalculés chaque minute.
-- Clients : recherche par nom (sans accents), téléphone, fournisseur ou identifiant ; plusieurs abonnements, modification, archivage, suppression confirmée. Les archives ne comptent pas dans le tableau de bord mais sont sauvegardées.
-- Abonnement : les informations de connexion sont masquées et peuvent être révélées ou copiées individuellement. Les liens ne sont jamais ouverts automatiquement.
-- Renouvellement : nouvelle échéance et historique local. Aucun achat ni renouvellement n’est effectué chez un fournisseur. Un statut suspendu reste suspendu.
-- Partage : message modifiable, avertissement et confirmation de confidentialité avant ouverture du partage natif, de WhatsApp ou de SMS. L’envoi final est manuel. WhatsApp reçoit le texte lors de son ouverture ; le presse-papiers et les applications destinataires sortent du périmètre du coffre.
-- Sauvegarde : un mot de passe de sauvegarde indépendant protège l’ensemble des clients, abonnements, identifiants, historiques et paramètres fournisseur. Aucun export en clair n’est proposé. Vérifier que le fichier a effectivement été conservé : la date affichée indique un export lancé, pas une copie externe garantie.
-- Restauration : vérification cryptographique avant aperçu, puis confirmation. Les doublons sont identifiés par ID, téléphone normalisé ou nom exact. Choisir de conserver les fiches existantes (défaut) ou de remplacer intégralement les correspondantes. Les correspondances ambiguës sont refusées. Les paramètres fournisseur actuels restent conservés, comme indiqué dans l’aperçu. Sur un nouvel appareil, créer un coffre puis restaurer le fichier avec son mot de passe de sauvegarde.
-- CSV : séparateurs virgule ou point-virgule, UTF-8, champs entre guillemets ; association des colonnes, aperçu sans identifiants visibles, erreurs par ligne et confirmation. Les dates utilisent AAAA-MM-JJ. Un abonnement importé nécessite une expiration ; le début est aujourd’hui s’il n’est pas renseigné. Corriger toutes les erreurs avant import. Les doublons sont ignorés. Le fichier et ses données ne sont pas persistés en clair par l’application.
+Les enregistrements réussis sont confirmés seulement après réponse du serveur.
+Une erreur réseau ou un conflit de révision n’est jamais présenté comme un succès.
+Les écritures concurrentes périmées sont refusées et un lot de modifications
+échoue atomiquement si un coffre a changé.
 
-## Sécurité
+Une connexion réseau est nécessaire pour ouvrir le compte et synchroniser. Il n’y
+a pas encore de file de modifications hors ligne. En cas d’erreur, garder le
+formulaire ouvert et réessayer ; ne pas fermer en supposant qu’il est sauvegardé.
 
-Le coffre complet est chiffré avant toute écriture IndexedDB : PBKDF2-SHA-256, 600 000 itérations, sel aléatoire de 128 bits, AES-256-GCM, IV neuf de 96 bits à chaque écriture et données additionnelles authentifiées versionnées. Chaque sauvegarde utilise un nouveau sel et son propre mot de passe. Les paramètres importés sont bornés et les structures validées avant modification. La clé Web Crypto est non exportable, conservée uniquement en mémoire ; le mot de passe maître n’est jamais enregistré. Aucun secret dans localStorage, les URL de l’application ou les journaux.
+**Paramètres → Importer mon ancien coffre local** permet de déverrouiller l’ancien
+coffre de ce navigateur et d’importer ses fiches vers la clientèle affichée. La
+copie locale reste conservée. Les autres adresses, Safari et les PWA peuvent avoir
+des espaces locaux différents ; depuis un autre espace, utiliser un export chiffré
+et sa restauration. L’application ne peut pas lire le stockage d’une autre origine.
+Les doublons sont prévisualisés ou conservés sans remplacement selon le parcours.
 
-Chaque écriture est une transaction atomique. Un contrôle de version refuse les sauvegardes périmées venant d’un second onglet. Une erreur de stockage ne remplace pas l’état affiché comme enregistré. Le coffre se verrouille après 5 minutes sans interaction et dès que l’application passe en arrière-plan. Les modifications de formulaire non enregistrées sont alors abandonnées. Le mot de passe n’a aucune procédure de récupération : une sauvegarde et son propre mot de passe permettent de restaurer dans un nouveau coffre.
+Les exports sont chiffrés avec un mot de passe de sauvegarde indépendant.
+Conserver également des exports hors de l’appareil. Ne pas considérer le stockage
+Safari, une date d’export ou une unique copie serveur comme une sauvegarde externe.
+Les requêtes API sont limitées à environ 3,5 Mo par lot dans cette version.
 
-Le chiffrement protège le stockage au repos. Il ne protège pas d’un appareil compromis, d’un script malveillant sur la même origine, d’une extension intrusive, d’un mot de passe devinable ni d’un partage volontaire. Aucun audit de sécurité indépendant n’a été réalisé. Aucun Face ID n’est simulé.
+## Apparence et iPhone
 
-## Strong 8K : volontairement en attente
+L’application utilise le mode sombre permanent. Les réglages sont regroupés
+derrière la roue crantée, accessible depuis tous les onglets. Le bandeau de
+clientèle apparaît sur Accueil et Clients uniquement.
+Dans Safari, ouvrir l’adresse de production puis Partager → Sur l’écran d’accueil.
+L’installation, le partage natif et les comportements de stockage réels restent à
+vérifier sur un iPhone physique.
 
-`src/provider.ts` isole le contrat d’un adaptateur en lecture. L’écran de configuration stocke l’adresse HTTPS et la clé dans le coffre. **Aucun appel fournisseur n’est encore implémenté**, même pour tester la connexion : il manque la documentation 1.81. Les erreurs d’authentification/suspension et les consultations réelles seront implémentées à partir du protocole documenté, après vérification CORS/HTTPS et du mode de transport de la clé. Aucune récupération de liste complète des clients n’est promise. Les écritures distantes sont désactivées. Si un intermédiaire serveur s’avère nécessaire, cela devra être expliqué avant changement d’architecture.
+## Strong 8K
+
+Le test de connexion GOLD PANEL 1.81 consulte `action=reseller` via une fonction
+Vercel authentifiée, à l’adresse HTTPS fixe `https://8k.online-cms.ru/api/api.php`.
+Il affiche uniquement le compte, ses crédits et son état. La clé est envoyée dans
+le corps POST côté navigateur, transite en mémoire par le serveur puis est passée
+en query string au fournisseur comme requis par sa documentation. Elle n’est pas
+journalisée par l’application ; le fournisseur peut journaliser ses propres URL.
+Les redirections sont refusées et les réponses ont un délai et une taille limités.
+L’enregistrement facultatif conserve la clé dans le coffre chiffré existant.
+Deux panels Strong 8K sont configurables avec des noms, clés et résultats de test
+séparés. Une ancienne clé unique reste dans le premier panel. Chaque abonnement
+peut référencer un panel par identifiant stable, sans attribution automatique.
+Les panels restent attachés à la clientèle de leur propriétaire. Un import dont
+le panel n’existe pas est indiqué « à réassocier » plutôt que réattribué.
+Cette documentation ne propose aucun endpoint pour lister tous les clients.
+Le champ accepte une clé seule ou un lien complet de cette même API : seule la
+clé est extraite ; l’action du lien collé n’est jamais exécutée. Les réponses
+compte sont acceptées comme objet ou tableau singleton. Une réponse inconnue est
+signalée comme problème de format, sans accuser la clé. Les refus explicites
+clé/API/IP sont classés avec des messages fixes. Le diagnostic serveur journalise
+uniquement un code applicatif, sans clé, URL amont, corps ou message brut.
+Une réussite explicitement indiquée par le panel reste une connexion réussie
+même si le nom, le solde ou l’état facultatifs manquent. Ces valeurs sont `null`
+et affichées « Non communiqué », jamais remplacées par zéro ou un état actif.
+Les mêmes champs peuvent être lus dans un objet ou tableau singleton `data`.
+Le diagnostic des informations partielles ne journalise que leur présence et
+la forme des champs connus, aucune valeur fournisseur.
+Les actions distantes GOLD PANEL 1.81 sont disponibles : consultation d’un
+abonnement, lecture des bouquets, création M3U/MAG, renouvellement de 1/3/6/12
+mois et activation/suspension. Elles passent par une confirmation explicite avec
+client, panel, durée et bouquet. Les tarifs en crédits ne sont pas inventés.
+Un abonnement sans panel conserve le renouvellement de suivi uniquement, indiqué
+comme tel. Les dates reçues du panel sont utilisées ; une date non communiquée
+doit être renseignée après vérification, sans extrapolation automatique.
+
+`app_tv_provider_operations` contient les reçus et contextes chiffrés par
+destinataire (propriétaire et administrateurs), sans clé API ni identifiants en
+clair. La réservation atomique et l’identifiant d’opération empêchent un nouvel
+envoi du même achat. Un résultat incertain bloque la ressource jusqu’à vérification
+manuelle. Les résultats réussis peuvent être enregistrés dans la fiche après
+reconnexion depuis Paramètres → Opérations fournisseur à reprendre. Une erreur de
+sauvegarde de la fiche ne réexécute jamais la mutation. Les reçus restent
+chiffrés après clôture et les règles RLS isolent les revendeurs. Le fournisseur
+ne propose pas de clé d’idempotence : une coupure au mauvais instant impose une
+vérification dans son panel, surtout pour une création M3U sans identifiants reçus.
+
+## Développement
+
+Node 24 et npm. `npm ci`, `npm test`, `npm run build`.
+Les API sont des fonctions Vercel dans `api/`, avec les variables serveur
+`SUPABASE_URL` et `SUPABASE_PUBLISHABLE_KEY`. La clé publiable est utilisée sous
+la session de l’utilisateur ; la clé `service_role` n’est jamais fournie à Vercel
+ni au navigateur. Elle reste dans la fonction Supabase `app-tv-account`, qui
+vérifie elle-même les sessions pour les opérations d’administration et les
+invitations/preuves de récupération pour les opérations publiques.
+
+`supabase/schema.sql` conserve le schéma final ; les évolutions appliquées au
+projet sont suivies dans son historique de migrations. Toujours inspecter le
+schéma et les comptes existants avant d’appliquer des évolutions.
+Les deux invitations administrateurs initiales sont créées via l’accès de gestion
+sur les deux emails expressément choisis par les associés. Ne jamais promouvoir
+le premier inscrit automatiquement et ne jamais partager les liens dans un dépôt.
 
 ## Vérifications
 
-```sh
-npm test
-npm run build
-# Dans un terminal séparé : npm run preview
-# Installer Chromium si aucun navigateur n’est présent : npx playwright install chromium
-npm run test:browser
-```
+- `npm test` : règles métier, chiffrement local, chiffrement multi-destinataires,
+  mauvais mots de passe, récupération, intégrité, séparation des identifiants de
+  connexion et de chiffrement, frontière serveur et protection des cookies.
+- `tests/sql/access.sql` : tests RLS exécutés sur Postgres dans une transaction
+  intégralement annulée, avec deux administrateurs et deux revendeurs fictifs.
+- `tests/accounts-browser.mjs` : parcours complet de comptes et synchronisation
+  sur l’adresse de test configurée par `APP_TV_TEST_URL`. Exige des invitations de
+  test préparées, à usage unique ; ne pas le lancer sur des comptes réels.
+- `tests/browser.mjs` : régression de l’ancien coffre local. Construire avec
+  `VITE_LEGACY_MODE=enabled npm run build` avant de le servir sur le port 4173.
+  Reconstruire normalement ensuite pour la version avec comptes.
 
-`CHROMIUM_PATH` peut sélectionner un navigateur système. Le parcours navigateur crée uniquement des données de test dans un profil temporaire et produit ses captures dans `/tmp`. Il couvre le stockage chiffré, le rechargement/déverrouillage, les champs masqués, le renouvellement, l’export/restauration, le format mobile et le rechargement hors ligne. Les tests unitaires couvrent chiffrement, intégrité, mauvais mots de passe, CSV, doublons, dates, renouvellements et écritures concurrentes.
+Les captures et secrets des comptes fictifs restent dans `/tmp` et `work/` de
+l’environnement. Les identités et coffres temporaires doivent être supprimés après
+les tests. Aucun test ne doit utiliser ni modifier le projet La Crème Rose.
 
-Validé dans cet environnement : compilation TypeScript/Vite, tests unitaires et Chromium. **Safari iOS réel, installation sur écran d’accueil, partage natif et comportement de purge iOS restent à vérifier sur iPhone.** Aucun hébergement, publication de l’environnement ou envoi vers GitHub n’est réalisé par ces commandes.
+## Livraison des sources
 
-Architecture : `model.ts` règles métier, `crypto.ts` coffre/sauvegardes, `storage.ts` IndexedDB, `csv.ts` import, `provider.ts` intégration isolée, `App.tsx` interface. Le dépôt initial est vide ; aucune donnée de démonstration n’est ajoutée dans le coffre réel.
+Voir `CAHIER_DES_CHARGES.md` pour la version et ses limites. Toute livraison
+doit être enregistrée sur une branche GitHub avec une Pull Request vers `main`.
+La fusion reste à l’utilisateur, conformément à `AGENTS.md`. Vérifier le commit
+distant et la correspondance avec Vercel ; un déploiement seul ne synchronise pas
+le dépôt. Aucun secret, contenu de clientèle ou capture de compte réel ne doit
+être versionné.

@@ -1,27 +1,32 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#111312" />
+    <meta name="theme-color" content="#101315" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
+    <meta name="apple-mobile-web-app-title" content="SCDR TV" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="description"
-      content="Votre carnet privé de clients et d’abonnements. Local, chiffré et disponible hors ligne."
+      content="Votre espace de gestion de clients et d’abonnements. Comptes personnels, données chiffrées et accès par revendeur."
     />
-    <link rel="icon" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/scdr-tv-192.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/scdr-tv-apple-touch.png"
+    />
+    <link rel="preload" as="image" href="/scdr-tv-logo.webp" />
+    <link rel="preload" as="image" href="/scdr-tv-screen.webp" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>Privé — Clients & abonnements</title>
+    <title>SCDR TV — Clients & abonnements</title>
   </head>
   <body>
+    <div class="ios-status-surface" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

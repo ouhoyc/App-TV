@@ -110,3 +110,180 @@ Ici, les données confidentielles doivent être partagées avec un collègue. Le
 4. Tu testes vraiment, tu vérifies l'état réel, tu dis honnêtement ce qui est testé ou non.
 5. PR vers `main` que je fusionne moi-même, numéro de version, cahier des charges à jour.
 6. Confidentialité : chiffrement de bout en bout, personne d'autre que nous deux, jamais de secret ni de donnée réelle dans le code.
+
+
+---
+
+# SCDR TV — instructions de travail
+
+## Vérifier chaque livraison
+
+Instruction explicite de l’utilisateur : après chaque modification, vérifier
+soi-même que les éléments déjà validés sont toujours présents, visibles et
+utilisables. Une correction ne doit pas masquer un autre bouton ou bandeau.
+Effectuer ces vérifications avant chaque publication et vérifier ensuite la
+version effectivement publiée.
+
+Pour toute modification de l’interface, de la connexion ou du viewport :
+
+- Contrôler les six onglets validés : Accueil, Clients, Revendeurs, Expirations,
+  Bilan et Médias.
+  La roue crantée doit rester visible et ouvrir les paramètres.
+- Vérifier que « Notre clientèle » (administrateurs), « Ma clientèle » (revendeur)
+  et le sélecteur sont visibles et accessibles sur Accueil et Clients uniquement,
+  sans être recouverts par l’en-tête, après défilement, connexion ou fermeture
+  d’une fenêtre. Ils sont absents des autres onglets.
+- Vérifier l’écran de connexion : TV en grand, animation des lettres pendant
+  la connexion, petite clé visible et utilisable, formulaire de mot de passe
+  accessible, annulation de Face ID et retour au mot de passe opérationnels.
+- Préserver le verrouillage demandé : aucune limite au premier plan ; cinq
+  minutes consécutives en arrière-plan, avec contrôle du temps écoulé au retour.
+- Contrôler les paramètres : compte et email, Face ID, verrouillage manuel,
+  actualisation et déconnexion. Préserver les droits administrateur/revendeur.
+- Vérifier le haut ET le bas de l’écran : pas de contenu masqué, de bande vide,
+  de zoom involontaire, de bouton hors de la zone visible ou de débordement.
+  Tester portrait, paysage et petit écran, avec des données vides et chargées.
+- Tester les deux géométries des installations iPhone : ancienne présentation
+  translucide avec inset supérieur et nouvelle présentation opaque sans inset.
+  Reproduire aussi un viewport visuel plus court ou décalé après le clavier,
+  même si `lvh` conserve une ancienne hauteur. Ne pas supposer que `vh`, `lvh`,
+  `innerHeight` et `visualViewport.height` sont identiques.
+- Examiner les captures produites par les tests lorsque le rendu est modifié.
+  Utiliser les outils et le code disponibles ; éviter de demander à l’utilisateur
+  des captures répétées pour remplacer ces vérifications.
+
+Vérifications minimales avant publication d’une modification d’interface :
+
+1. `npm run build` et `git diff --check`.
+2. `node tests/mobile-layout-browser.mjs`.
+3. `node tests/login-screen-browser.mjs`.
+4. `node tests/premium-design-browser.mjs`.
+5. `node tests/device-unlock-browser.mjs`.
+
+Adapter et compléter les scénarios quand un nouveau cas réel révèle une lacune.
+Vérifier également les tests métier, serveur et chiffrement si leur logique est
+touchée, et le parcours de mise à jour si le service worker ou son cache change.
+Corriger les régressions avant de publier, plutôt que demander à l’utilisateur
+de les détecter après chaque livraison.
+
+## Vérification de production et limites des tests
+
+- Confirmer la bonne équipe, le bon projet et le bon environnement Vercel.
+  Attendre l’état READY et vérifier le domaine utilisé par l’utilisateur.
+- Vérifier que les fichiers JavaScript/CSS servis correspondent au build testé
+  et que les ressources de l’interface se chargent correctement.
+- Ne pas annoncer qu’un problème propre à un iPhone réel a été reproduit ou
+  résolu sur cet appareil à partir de tests Chromium uniquement. Distinguer
+  ce qui a été vérifié dans les outils et ce qui nécessite son retour réel.
+- En cas de correctif inefficace, reprendre le diagnostic à partir du symptôme
+  et des preuves ; ne pas empiler des changements CSS sans vérifier l’hypothèse.
+
+## Préserver les accès et les données
+
+Ne pas effacer le stockage local, les clés Face ID ou les données de compte pour
+résoudre un problème de présentation. Les changements de mode de barre système
+iOS peuvent être mémorisés à l’installation : expliquer la nécessité éventuelle
+d’un nouvel ajout à l’écran d’accueil et conserver l’ancien accès jusqu’à ce que
+le nouveau fonctionne.
+
+Respecter les choix validés : application SCDR TV, logo TV choisi par l’utilisateur,
+palette actuelle sombre et paramètres regroupés derrière la roue crantée.
+Une nouvelle instruction explicite de l’utilisateur peut faire évoluer ces choix.
+
+Les deux associés ont deux accès administrateurs au même espace : « Notre clientèle »
+et les deux panels Strong 8K sont communs. Ne pas recréer de clientèle séparée par
+associé. Les sous-revendeurs restent isolés. Le sélecteur utilise un vrai `select`
+pour ouvrir le choix natif iPhone, sans cadre bleu au toucher. L’animation du logo
+doit rester légère : réutiliser les images existantes et animer seulement des
+transforms sur de petites couches HTML, sans repeindre le logo entier par image.
+
+## Opérations fournisseur
+
+Ne jamais lancer une création ou un renouvellement réel pour tester l’app.
+Les opérations payantes passent par une confirmation explicite du client,
+du panel et de la durée. Préserver le journal chiffré, l’identifiant stable de
+chaque demande et le blocage d’une opération dont le résultat reste incertain.
+Ne jamais réessayer automatiquement une mutation après un délai dépassé ou une
+coupure. Préserver les résultats en cas d’échec de sauvegarde locale/cloud et
+le parcours Paramètres → Opérations fournisseur à reprendre.
+
+Après modification de ces parcours, exécuter aussi les tests
+`tests/provider-operations.test.js`, `src/providerWorkflow.test.ts` et les
+scénarios fournisseur de `tests/premium-design-browser.mjs`. Pour un changement
+de journal ou de droits, contrôler `tests/sql/provider-operations.sql` dans une
+transaction annulée. Ne jamais écrire de clé API, d’identifiants ou de réponse
+fournisseur brute dans les journaux.
+
+## Fiches clients, bilan et médias
+
+Ne pas ajouter de colonne paiement : une icône à côté du pseudo signale
+uniquement les abonnements non réglés ; elle disparaît après règlement.
+Supprimer les sous-titres génériques qui répètent le nom de l’onglet.
+Conserver les prix d’achat et de vente par vente/renouvellement ; modifier
+le coût d’un panel ne doit pas réécrire les bénéfices passés. Les tests durent
+24 heures exactes. Vérifier les notifications et le partage sans promettre
+une réception iPhone ou une publication en story non testée sur appareil réel.
+Les publicités sont chiffrées, accessibles à leur propriétaire et aux associés.
+
+Choix validés le 29 octobre : un seul champ Pseudo (identifiant de connexion),
+un seul champ Notes, sans sélecteur de type de connexion ni saisie du M3U
+complet. Les mots de passe clients et les adresses serveur sont affichés en
+clair et copiables ; ne pas transformer le serveur en lien de navigation.
+Préserver le masquage des mots de passe d’authentification et des clés API.
+Le coût se préremplit depuis le panel choisi ; préserver les coûts historiques.
+Les impayés utilisent des pièces rouges. Le bilan présente deux indicateurs
+principaux : bénéfice et bénéfice par mois. Trier la liste par expiration
+décroissante (y compris plusieurs abonnements pour un client).
+Un seul bouton Panel, discret et présent dans l’en-tête de tous les onglets,
+ouvre le lien configuré dans Paramètres → Site du panel. Pas de double lien
+en tête de Médias. Réduire les photos avant chiffrement/envoi, accepter les
+photos de galerie de plus de 12 Mo et contrôler le poids du résultat chiffré.
+
+Choix validés le 30 octobre : galerie de petites vignettes, deux catégories
+Publicités/Tutos, visionneuse plein écran avec balayage entre les photos.
+Chiffrer également les vignettes et ne charger les grands fichiers que pour
+la visionneuse ou la migration initiale des anciennes images. Le cache local
+ne contient que des enveloppes chiffrées et ne remplace jamais les règles
+d’accès à la liste. Les images existantes restent lisibles et acquièrent
+leur vignette au premier affichage. Vérifier les parcours migration/cache.
+Les tests 24 h précèdent tous les autres abonnements dans la liste. Ajouter
+IBO Player, accepter les URL sans protocole et retirer l’ajout manuel d’un
+second abonnement. La première vente du bilan utilise la date de début
+d’abonnement, y compris pour les historiques saisis après coup.
+Pseudo Diogo en jaune, Poyeland en bleu ; utiliser trois pièces empilées pour
+le bilan et les impayés. Le bouton Panel doit demander Safari sur iPhone
+installé, sans prétendre à un test physique depuis Chromium.
+Pour accélérer Face ID, conserver la vérification réelle côté serveur :
+le SDK épinglé setSession vérifie le token via Auth ; ne pas la remplacer
+par un simple décodage du JWT. Tester le rejet des jetons refusés et des
+comptes suspendus et l’absence de requêtes de connexion redondantes.
+La documentation GOLD PANEL 1.81 fournie ne décrit que sub=1,3,6,12 : ne
+pas inventer une commande de test 24 h et ne pas lancer une création réelle
+pour en deviner le comportement ou prétendre que le fournisseur l’a refusée.
+
+Derniers choix : masquer la navigation basse pendant le clavier logiciel pour
+qu’elle ne remonte pas au-dessus du clavier ; la restaurer à sa position exacte
+après fermeture. Tester la recherche avec un visualViewport rétréci et son
+retour à la hauteur initiale. Entrée termine la recherche et ferme le clavier.
+Bilan : deux rectangles pleine largeur empilés ; pas de phrase « Équivalent
+mensuel ». La carte Clients de l’accueil doit ouvrir Clients.
+Ne jamais confondre abonnement valide, enabled=1 ou status=true avec une
+connexion en ligne. Le suivi des connexions ne montre que les champs live
+réellement fournis. Garder un statut inconnu, jamais un faux zéro, quand le
+fournisseur ne fournit pas ces données ; aucune chaîne ne peut être déduite
+d’un catalogue ou d’un ancien programme. Les lectures d’activité restent
+éphémères, limitées à l’espace autorisé et sans journaux de contenu visionné.
+
+
+## Livraison GitHub et Vercel
+
+À chaque livraison, enregistrer les sources et les tests dans GitHub avant de
+considérer la synchronisation terminée. Utiliser une branche et une Pull Request
+vers `main` ; la fusion reste effectuée par l’utilisateur. Ne jamais remplacer
+les consignes existantes ni écraser une branche modifiée par un autre outil.
+Ne pas livrer uniquement sur Vercel. Indiquer la branche et le commit exacts,
+vérifier la référence distante après le push et rattacher toute publication
+Vercel au commit testé. Conserver les secrets dans la configuration serveur,
+jamais dans GitHub. Les choix plus récents explicitement validés pour SCDR TV
+(mode sombre permanent, verrouillage après cinq minutes en arrière-plan,
+comptes et bibliothèques déjà autorisés) priment sur les exemples historiques.

@@ -4,9 +4,38 @@ export interface Renewal {
   previous: string;
   next: string;
 }
+export type Plan =
+  "trial24" | "month1" | "month3" | "month6" | "year1" | "custom";
+export interface Sale {
+  id: string;
+  at: string;
+  sale: string;
+  cost: string;
+  paid: boolean;
+  months: number;
+  panelId: string;
+  plan: Plan;
+}
+export const contactPlatforms = [
+  "Snapchat",
+  "WhatsApp",
+  "Téléphone",
+  "Telegram",
+  "Autre",
+] as const;
 export interface Subscription {
   id: string;
   provider: string;
+  panelId?: string;
+  providerUserId?: string;
+  providerEnabled?: boolean | null;
+  syncedAt?: string;
+  plan?: Plan;
+  trialStartedAt?: string;
+  expiresAt?: string;
+  player?: "Tivimate" | "Smarters Player" | "IBO Player" | "";
+  paid?: boolean;
+  sales?: Sale[];
   type: Connection;
   username: string;
   password: string;
@@ -26,15 +55,35 @@ export interface Client {
   name: string;
   phone: string;
   whatsapp: string;
+  contact?: { platform: (typeof contactPlatforms)[number]; value: string };
   notes: string;
   archived: boolean;
   createdAt: string;
   subscriptions: Subscription[];
 }
+export interface ProviderPanel {
+  id: string;
+  name: string;
+  key: string;
+  annualCost?: string;
+  dashboardUrl?: string;
+}
+export interface ProviderSettings {
+  dashboardUrl?: string;
+  url: string;
+  key: string;
+  panels?: ProviderPanel[];
+}
+export function providerPanels(settings: ProviderSettings): ProviderPanel[] {
+  return (
+    settings.panels ??
+    (settings.key ? [{ id: "legacy", name: "Panel 1", key: settings.key }] : [])
+  );
+}
 export interface Vault {
   version: 1;
   clients: Client[];
-  provider: { url: string; key: string };
+  provider: ProviderSettings;
   lastBackup: string | null;
 }
 export const emptyVault = (): Vault => ({
@@ -74,6 +123,10 @@ export function addMonths(start: string, months: number) {
 }
 export function state(s: Subscription) {
   if (s.status === "disabled") return "Suspendu";
+  if (s.plan === "trial24")
+    return Date.parse(s.expiresAt || s.expires + "T23:59:59") <= Date.now()
+      ? "À prolonger"
+      : "Test 24 h";
   const n = daysLeft(s.expires);
   return n < 0 ? "Expiré" : n <= 7 ? "À renouveler" : "Actif";
 }
@@ -81,6 +134,9 @@ export function newSubscription(): Subscription {
   return {
     id: crypto.randomUUID(),
     provider: "",
+    plan: "custom",
+    paid: false,
+    player: "",
     type: "M3U",
     username: "",
     password: "",
@@ -186,6 +242,25 @@ export function validateVault(value: unknown): asserts value is Vault {
     !(value.lastBackup === null || typeof value.lastBackup === "string")
   )
     throw new Error("Format du coffre non reconnu.");
+  if (value.provider.panels !== undefined) {
+    const panels = value.provider.panels;
+    if (
+      !Array.isArray(panels) ||
+      panels.length > 2 ||
+      panels.some(
+        (p) =>
+          !obj(p) ||
+          !strings(p, ["id", "name", "key"]) ||
+          !(p.id as string).trim() ||
+          (p.id as string).length > 100 ||
+          !(p.name as string).trim() ||
+          (p.name as string).length > 80 ||
+          (p.key as string).length > 512,
+      ) ||
+      new Set(panels.map((p) => p.id)).size !== panels.length
+    )
+      throw new Error("Configuration des panels invalide.");
+  }
   const ids = new Set<string>();
   for (const c of value.clients) {
     if (
@@ -194,6 +269,13 @@ export function validateVault(value: unknown): asserts value is Vault {
       !(c.name as string).trim() ||
       typeof c.archived !== "boolean" ||
       !Array.isArray(c.subscriptions) ||
+      (c.contact !== undefined &&
+        (!obj(c.contact) ||
+          !contactPlatforms.includes(
+            c.contact.platform as (typeof contactPlatforms)[number],
+          ) ||
+          typeof c.contact.value !== "string" ||
+          c.contact.value.length > 500)) ||
       c.subscriptions.length > 100 ||
       ids.has(c.id as string)
     )
@@ -220,6 +302,49 @@ export function validateVault(value: unknown): asserts value is Vault {
         ]) ||
         !["M3U", "MAG", "Autre"].includes(s.type as string) ||
         !["enabled", "disabled"].includes(s.status as string) ||
+        (s.panelId !== undefined &&
+          (typeof s.panelId !== "string" || s.panelId.length > 100)) ||
+        ["providerUserId", "syncedAt"].some(
+          (f) =>
+            s[f] !== undefined &&
+            (typeof s[f] !== "string" || (s[f] as string).length > 100),
+        ) ||
+        (s.providerEnabled !== undefined &&
+          s.providerEnabled !== null &&
+          typeof s.providerEnabled !== "boolean") ||
+        (s.plan !== undefined &&
+          ![
+            "trial24",
+            "month1",
+            "month3",
+            "month6",
+            "year1",
+            "custom",
+          ].includes(s.plan as string)) ||
+        (s.paid !== undefined && typeof s.paid !== "boolean") ||
+        (s.player !== undefined &&
+          !["", "Tivimate", "Smarters Player", "IBO Player"].includes(
+            s.player as string,
+          )) ||
+        ["expiresAt", "trialStartedAt"].some(
+          (f) =>
+            s[f] !== undefined &&
+            (typeof s[f] !== "string" ||
+              !Number.isFinite(Date.parse(s[f] as string))),
+        ) ||
+        (s.sales !== undefined &&
+          (!Array.isArray(s.sales) ||
+            s.sales.length > 1000 ||
+            s.sales.some(
+              (v) =>
+                !obj(v) ||
+                !strings(v, ["id", "at", "sale", "cost", "panelId", "plan"]) ||
+                !Number.isFinite(Date.parse(v.at as string)) ||
+                typeof v.paid !== "boolean" ||
+                typeof v.months !== "number" ||
+                v.months < 0 ||
+                v.months > 120,
+            ))) ||
         !validDate(s.start as string) ||
         !validDate(s.expires as string) ||
         (s.expires as string) < (s.start as string) ||
