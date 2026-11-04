@@ -106,6 +106,7 @@ Aucun secret ni donnée de clientèle réelle ne doit être publié.
 
 1. Construire, exécuter les tests et examiner les captures utiles.
 2. Créer un commit sur une branche de travail ; vérifier son SHA sur GitHub.
-3. Ouvrir une Pull Request vers `main` et laisser l’utilisateur la fusionner.
+3. Ouvrir une Pull Request vers `main` ; la fusionner soi-même (décision du
+   4 novembre) seulement après validation de l’utilisateur et tests verts.
 4. Vérifier le bon projet Vercel et la version réellement servie avant d’annoncer
    une mise en ligne. Ne jamais confondre dépôt synchronisé et application publiée.

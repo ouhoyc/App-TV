@@ -42,7 +42,7 @@ Par exemple régler quelque chose sur un site ou coller du code dans une console
 
 ## 3. Organisation du code et des versions
 
-- Une branche de travail. Chaque version passe par une **Pull Request vers `main`, que je fusionne moi-même**. `main` est protégée, et tu ne fusionnes jamais à ma place.
+- Une branche de travail. Chaque version passe par une **Pull Request vers `main`**. Depuis le 4 novembre, **tu fusionnes toi-même** la PR, uniquement si j'ai validé le changement (« go ») et si tous les tests passent ; tu vérifies ensuite la mise en ligne Vercel. En cas de problème en production, tu reviens à la version précédente et tu me préviens.
 - Un **numéro de version** à chaque livraison (1.0.0, 1.1.0…), affiché dans l'appli (Réglages). S'il y a un service worker, le numéro doit être changé aussi dans `sw.js`, sinon le téléphone ne voit pas la mise à jour.
 - Un **cahier des charges** (`CAHIER_DES_CHARGES.md`) tenu à jour : chaque version y ajoute une section « ce qui a changé et pourquoi », plus une liste « pistes pour plus tard » (mes idées non décidées).
 - Après chaque PR : explique-moi en français ce qui change pour moi et comment installer la mise à jour.
@@ -108,7 +108,7 @@ Ici, les données confidentielles doivent être partagées avec un collègue. Le
 2. Tu proposes → je valide → tu codes. Les petits ajustements clairs peuvent être faits directement.
 3. Zéro dépendance externe sans mon accord. Rien d'irréversible sans mon accord.
 4. Tu testes vraiment, tu vérifies l'état réel, tu dis honnêtement ce qui est testé ou non.
-5. PR vers `main` que je fusionne moi-même, numéro de version, cahier des charges à jour.
+5. PR vers `main` que tu fusionnes toi-même après mon « go » et des tests verts, numéro de version, cahier des charges à jour.
 6. Confidentialité : chiffrement de bout en bout, personne d'autre que nous deux, jamais de secret ni de donnée réelle dans le code.
 
 
@@ -279,7 +279,7 @@ d’un catalogue ou d’un ancien programme. Les lectures d’activité restent
 
 À chaque livraison, enregistrer les sources et les tests dans GitHub avant de
 considérer la synchronisation terminée. Utiliser une branche et une Pull Request
-vers `main` ; la fusion reste effectuée par l’utilisateur. Ne jamais remplacer
+vers `main` ; depuis le 4 novembre, l’agent fusionne lui-même la PR après validation explicite et tests verts, puis vérifie Vercel. Ne jamais remplacer
 les consignes existantes ni écraser une branche modifiée par un autre outil.
 Ne pas livrer uniquement sur Vercel. Indiquer la branche et le commit exacts,
 vérifier la référence distante après le push et rattacher toute publication
