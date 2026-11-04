@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Copy } from "lucide-react";
 import Coins from "./StackedCoins";
 import {
   financialSummary,
@@ -25,119 +27,225 @@ export function safeLink(value: string) {
     return "";
   }
 }
+export type CustomerOrder = "access" | "due";
+type PanelFilter = "all" | "panel-diogo" | "panel-poyeland";
+function expiryTime(s: Subscription) {
+  return Date.parse(s.expiresAt || s.expires + "T23:59:59");
+}
+function dueLabel(s: Subscription, now = Date.now()) {
+  if (s.status === "disabled") return "Suspendu";
+  const left = expiryTime(s) - now;
+  if (left < 0) return "Expiré";
+  if (s.plan === "trial24") {
+    const hours = Math.max(1, Math.ceil(left / 36e5));
+    return hours >= 24 ? "Test 24 h" : `Encore ${hours} h`;
+  }
+  const days = Math.floor(left / 864e5);
+  return days === 0 ? "Aujourd’hui" : `Dans ${days} j`;
+}
+export function accessText(pseudo: string, sub: Subscription) {
+  return [
+    ["Pseudo", pseudo],
+    ["Mot de passe", sub.password],
+    ["Lien", serverAddress(sub)],
+  ]
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k} : ${v}`)
+    .join("\n");
+}
 export function CustomerTable({
   clients,
   onOpen,
   onPaid,
+  onCopy,
   busy,
+  order = "access",
   panelName = (client: Client, sub: Subscription) => sub.provider,
 }: {
   clients: Client[];
   onOpen: (id: string) => void;
   onPaid: (client: Client, subscription: Subscription) => void;
+  onCopy: (value: string, message?: string) => void;
   busy: boolean;
+  order?: CustomerOrder;
   panelName?: (client: Client, sub: Subscription) => string;
 }) {
+  const [filter, setFilter] = useState<PanelFilter>("all");
+  const rows = customerRows(clients).map((row) => ({
+    ...row,
+    accent: (row.subscription
+      ? panelAccent(panelName(row.client, row.subscription))
+      : "") as PanelFilter | "",
+  }));
+  if (order === "due")
+    rows.sort(
+      (a, b) =>
+        Number(!a.subscription) - Number(!b.subscription) ||
+        (a.subscription && b.subscription
+          ? expiryTime(a.subscription) - expiryTime(b.subscription)
+          : 0),
+    );
+  const counts = {
+    "panel-diogo": rows.filter((r) => r.accent === "panel-diogo").length,
+    "panel-poyeland": rows.filter((r) => r.accent === "panel-poyeland").length,
+  };
+  const shown =
+    filter === "all" ? rows : rows.filter((r) => r.accent === filter);
   return (
-    <div
-      className="customer-table-wrap"
-      tabIndex={0}
-      role="region"
-      aria-label="Tableau clients"
-    >
-      <table className="customer-table">
-        <thead>
-          <tr>
-            {[
-              "Pseudo",
-              "Mot de passe",
-              "Lien",
-              "Durée",
-              "Expiration",
-              "Contact",
-              "Application",
-              "Prix de vente",
-            ].map((h) => (
-              <th key={h}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {customerRows(clients).map(({ client: c, subscription: s }) => {
-            const contact = customerContact(c),
-              url = contactUrl(contact.platform, contact.value);
-            const pseudo = clientPseudo(c, s || undefined);
-            return (
-              <tr key={c.id + ":" + (s?.id || "empty")}>
-                <td>
-                  <span className="pseudo-cell">
+    <>
+      {(counts["panel-diogo"] > 0 || counts["panel-poyeland"] > 0) && (
+        <div
+          className="panel-filters"
+          role="group"
+          aria-label="Filtrer par panel"
+        >
+          {(
+            [
+              ["all", "Tous", rows.length],
+              ["panel-diogo", "Diogo", counts["panel-diogo"]],
+              ["panel-poyeland", "Poyeland", counts["panel-poyeland"]],
+            ] as const
+          ).map(([id, label, n]) => (
+            <button
+              key={id}
+              type="button"
+              className={(filter === id ? "selected " : "") + id}
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+            >
+              {id !== "all" && <i aria-hidden="true" />}
+              {label} <span>{n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <ul className="customer-cards" aria-label="Liste des clients">
+        {shown.map(({ client: c, subscription: s, accent }) => {
+          const contact = customerContact(c),
+            url = contactUrl(contact.platform, contact.value);
+          const pseudo = clientPseudo(c, s || undefined);
+          const server = s ? serverAddress(s) : "";
+          return (
+            <li
+              className={"customer-card " + accent}
+              key={c.id + ":" + (s?.id || "empty")}
+            >
+              <div className="customer-card-head">
+                <span className="pseudo-cell">
+                  <button
+                    type="button"
+                    className={"table-pseudo " + accent}
+                    title={s ? panelName(c, s) : undefined}
+                    onClick={() => onOpen(c.id)}
+                  >
+                    {pseudo}
+                  </button>
+                  {s && s.paid !== true && (
                     <button
                       type="button"
-                      className={
-                        "table-pseudo " + panelAccent(s ? panelName(c, s) : "")
-                      }
-                      title={s ? panelName(c, s) : undefined}
-                      onClick={() => onOpen(c.id)}
+                      className="unpaid-icon"
+                      disabled={busy}
+                      title="Pas encore réglé"
+                      aria-label={`Non réglé : ${pseudo}. Marquer comme réglé`}
+                      onClick={() => onPaid(c, s)}
                     >
-                      {pseudo}
+                      <Coins size={19} />
                     </button>
-                    {s && s.paid !== true && (
-                      <button
-                        type="button"
-                        className="unpaid-icon"
-                        disabled={busy}
-                        title="Pas encore réglé"
-                        aria-label={`Non réglé : ${pseudo}. Marquer comme réglé`}
-                        onClick={() => onPaid(c, s)}
-                      >
-                        <Coins size={19} />
-                      </button>
-                    )}
-                  </span>
-                </td>
-                <td className="table-plain-secret">{s?.password || "—"}</td>
-                <td className="table-server">
-                  {s ? serverAddress(s) || "—" : "—"}
-                </td>
-                <td>{s ? planLabels[planOf(s)] : "—"}</td>
-                <td>
-                  {s
-                    ? new Intl.DateTimeFormat("fr-FR", {
-                        dateStyle: "short",
+                  )}
+                </span>
+                {s && (
+                  <span className="customer-due">
+                    <strong>{dueLabel(s)}</strong>
+                    <small>
+                      {new Intl.DateTimeFormat("fr-FR", {
+                        dateStyle: "medium",
                         ...(s.plan === "trial24"
                           ? { timeStyle: "short" as const }
                           : {}),
                       }).format(
                         new Date(s.expiresAt || s.expires + "T12:00:00"),
-                      )
-                    : "—"}
-                </td>
-                <td>
-                  {contact.value ? (
-                    <>
-                      {url ? (
-                        <a href={url} target="_blank" rel="noopener noreferrer">
-                          {contact.value}
-                        </a>
-                      ) : (
-                        contact.value
                       )}
-                      <small>{contact.platform}</small>
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>{s?.player || "—"}</td>
-                <td>
-                  {s?.sale !== undefined && s.sale !== "" ? money(s.sale) : "—"}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                    </small>
+                  </span>
+                )}
+              </div>
+              {s && (
+                <>
+                  <div className="customer-line">
+                    <span>Mot de passe</span>
+                    <code className="table-plain-secret">
+                      {s.password || "—"}
+                    </code>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={!s.password}
+                      aria-label={"Copier le mot de passe de " + pseudo}
+                      onClick={() => onCopy(s.password)}
+                    >
+                      <Copy size={17} />
+                    </button>
+                  </div>
+                  <div className="customer-line">
+                    <span>Lien</span>
+                    <code className="table-server">{server || "—"}</code>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={!server}
+                      aria-label={"Copier le lien de " + pseudo}
+                      onClick={() => onCopy(server)}
+                    >
+                      <Copy size={17} />
+                    </button>
+                  </div>
+                  <div className="customer-card-foot">
+                    <span className="customer-tags">
+                      {s.player && (
+                        <span className="customer-tag app">{s.player}</span>
+                      )}
+                      <span className="customer-tag">
+                        {planLabels[planOf(s)]}
+                      </span>
+                      {s.sale !== undefined && s.sale !== "" && (
+                        <span className="customer-tag">{money(s.sale)}</span>
+                      )}
+                      {contact.value &&
+                        (url ? (
+                          <a
+                            className="customer-tag contact"
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {contact.value}
+                          </a>
+                        ) : (
+                          <span className="customer-tag contact">
+                            {contact.value}
+                          </span>
+                        ))}
+                    </span>
+                    <button
+                      type="button"
+                      className="copy-access"
+                      aria-label={"Copier les accès de " + pseudo}
+                      onClick={() => {
+                        const text = accessText(pseudo, s);
+                        onCopy(text, `Accès de ${pseudo} copiés\n${text}`);
+                      }}
+                    >
+                      <Copy size={16} />
+                      Copier les accès
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 export function FinancialDashboard({

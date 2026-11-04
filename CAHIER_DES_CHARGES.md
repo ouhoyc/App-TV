@@ -1,5 +1,35 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.0 — nouveau design « Liquid Glass »
+
+Choisi le 4 novembre parmi trois maquettes (A Liquid Glass, B Bento,
+C Priorités). Mêmes écrans, mêmes couleurs, même logo : seule l’apparence
+change, plus la nouvelle liste Clients.
+
+### Ce qui a changé et pourquoi
+
+- Matière « verre » sur l’en-tête (Panel, roue crantée), le sélecteur de
+  clientèle, les cartes et la barre d’onglets, sans flou d’arrière-plan sur
+  l’en-tête et la navigation (règle de performance iPhone conservée).
+- Grands titres, boutons en pilule, textes plus lisibles.
+- Accueil : le nombre de clients est entouré d’un anneau de progression.
+- Clients : le tableau devient une liste de cartes. Priorité au pseudo, au
+  mot de passe et à la date, puis le lien et l’application. Bouton
+  « Copier les accès » (pseudo, mot de passe, lien ; sans l’application).
+  Vues Accès / Échéances / Archives et filtres Tous / Diogo / Poyeland.
+  Plus d’initiale ronde : la couleur repère le panel (Diogo jaune,
+  Poyeland bleu). Les statuts d’échéance ne sont plus colorés.
+- Accueil et Expirations : barre de couleur du panel sur chaque ligne.
+- Bilan : deux rectangles empilés conservés ; les ventes deviennent une liste
+  lisible sur iPhone au lieu d’un tableau coupé à droite.
+- Médias, Revendeurs, fiche client : mêmes contenus, nouveau style.
+
+### Pistes pour plus tard
+
+- Feuille qui monte du bas pour la fiche client (non faite : contrôle de la
+  zone visible du bas d’écran à préserver).
+- Grouper les Expirations par « En retard » / « Cette semaine ».
+
 ## Version 1.0.0 — synchronisation des sources GitHub
 
 Cette version rassemble les évolutions réalisées depuis le premier prototype.

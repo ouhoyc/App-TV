@@ -84,7 +84,11 @@ import { watchBackgroundLock } from "./backgroundLock";
 import ProviderWorkflow, { ProviderHistory } from "./ProviderWorkflow";
 import type { ProviderContext, ProviderOperation } from "./providerWorkflow";
 import type { CloudPayload } from "./cloudCrypto";
-import { CustomerTable, FinancialDashboard } from "./Business";
+import {
+  CustomerTable,
+  FinancialDashboard,
+  type CustomerOrder,
+} from "./Business";
 import {
   applyPlan,
   customerContact,
@@ -297,6 +301,7 @@ export default function App({
     [online, setOnline] = useState(navigator.onLine),
     [storageError, setStorageError] = useState(false);
   const [archived, setArchived] = useState(false),
+    [customerOrder, setCustomerOrder] = useState<CustomerOrder>("access"),
     [expiryFilter, setExpiryFilter] = useState("followup");
   const scrollPane = useRef<HTMLDivElement>(null);
   function navigate(next: Page) {
@@ -446,11 +451,12 @@ export default function App({
       setError((e as Error).message);
     }
   }
-  async function copy(value: string) {
+  async function copy(value: string, message?: string) {
     try {
       await navigator.clipboard.writeText(value);
       setNotice(
-        "Copié. Le presse-papiers peut être accessible à d’autres applications.",
+        message ||
+          "Copié. Le presse-papiers peut être accessible à d’autres applications.",
       );
     } catch {
       setError("Copie indisponible dans ce navigateur.");
@@ -626,6 +632,21 @@ export default function App({
     .sort((a, b) =>
       a.subscription.expires.localeCompare(b.subscription.expires),
     );
+  const panelNameFor = (client: Client, sub: Subscription) =>
+    providerPanels(cloud ? cloud.providerFor(client.id) : vault.provider).find(
+      (p) => p.id === sub.panelId,
+    )?.name || sub.provider;
+  const activeShare = activeClients.length
+    ? Math.round(
+        (activeClients.filter((c) =>
+          c.subscriptions.some(
+            (s) => s.status === "enabled" && daysLeft(s.expires) >= 0,
+          ),
+        ).length /
+          activeClients.length) *
+          100,
+      )
+    : 0;
   const current =
     dialog?.kind === "detail"
       ? vault.clients.find((c) => c.id === dialog.id)
@@ -854,6 +875,7 @@ export default function App({
               <button
                 type="button"
                 className="activity-card"
+                style={{ "--share": activeShare + "%" } as React.CSSProperties}
                 aria-label="Voir les clients"
                 onClick={() => navigate("clients")}
               >
@@ -975,7 +997,12 @@ export default function App({
                   </div>
                   {soon.length ? (
                     soon.slice(0, 4).map(({ client: c, subscription: s }) => (
-                      <div className="expiry-row" key={s.id}>
+                      <div
+                        className={
+                          "expiry-row " + panelAccent(panelNameFor(c, s))
+                        }
+                        key={s.id}
+                      >
                         <span className="avatar">
                           {initials(clientPseudo(c))}
                         </span>
@@ -1029,15 +1056,34 @@ export default function App({
           {page === "clients" && (
             <section className="panel">
               <div className="section-heading">
-                <div className="tabs">
+                <div className="tabs" role="group" aria-label="Affichage">
                   <button
-                    className={!archived ? "active" : ""}
-                    onClick={() => setArchived(false)}
+                    className={
+                      !archived && customerOrder === "access" ? "active" : ""
+                    }
+                    aria-pressed={!archived && customerOrder === "access"}
+                    onClick={() => {
+                      setArchived(false);
+                      setCustomerOrder("access");
+                    }}
                   >
-                    Clients <span>{activeClients.length}</span>
+                    Accès <span>{activeClients.length}</span>
+                  </button>
+                  <button
+                    className={
+                      !archived && customerOrder === "due" ? "active" : ""
+                    }
+                    aria-pressed={!archived && customerOrder === "due"}
+                    onClick={() => {
+                      setArchived(false);
+                      setCustomerOrder("due");
+                    }}
+                  >
+                    Échéances
                   </button>
                   <button
                     className={archived ? "active" : ""}
+                    aria-pressed={archived}
                     onClick={() => setArchived(true)}
                   >
                     Archives
@@ -1055,11 +1101,9 @@ export default function App({
               {!!searched.length && (
                 <CustomerTable
                   clients={searched}
-                  panelName={(client, sub) =>
-                    providerPanels(
-                      cloud ? cloud.providerFor(client.id) : vault.provider,
-                    ).find((p) => p.id === sub.panelId)?.name || sub.provider
-                  }
+                  order={archived ? "access" : customerOrder}
+                  onCopy={(value, message) => void copy(value, message)}
+                  panelName={panelNameFor}
                   busy={busy}
                   onOpen={(id) => setDialog({ kind: "detail", id })}
                   onPaid={(client, sub) =>
@@ -1125,7 +1169,12 @@ export default function App({
                   );
                 return items.length ? (
                   items.map(({ client: c, subscription: s }) => (
-                    <div className="expiry-row" key={s.id}>
+                    <div
+                      className={
+                        "expiry-row " + panelAccent(panelNameFor(c, s))
+                      }
+                      key={s.id}
+                    >
                       <span className="avatar">
                         {initials(clientPseudo(c))}
                       </span>
