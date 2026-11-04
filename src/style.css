@@ -4596,3 +4596,130 @@ dialog {
   color: var(--muted);
   flex-shrink: 0;
 }
+
+/* Version 1.1.4 — note qui défile quand elle est trop longue. */
+.customer-note {
+  overflow: hidden;
+  text-overflow: clip;
+}
+.customer-note > span {
+  display: inline-block;
+  white-space: nowrap;
+}
+.customer-note:not(.scrolling) > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .customer-note.scrolling > span {
+    animation: note-scroll var(--note-duration, 6s) ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-note.scrolling > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+}
+@keyframes note-scroll {
+  0%,
+  22% {
+    transform: translateX(0);
+  }
+  62%,
+  80% {
+    transform: translateX(var(--note-shift, 0));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Version 1.1.4 — lettres SCDR : vrai tremblement de télé cartoon
+   (transforms seulement, chaque lettre décalée). */
+@media (prefers-reduced-motion: no-preference) {
+  .logo-letter {
+    animation: scdr-letter-shake 0.62s steps(1, end) infinite;
+    transform-origin: 50% 70%;
+  }
+}
+@keyframes scdr-letter-shake {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  10% {
+    transform: translate3d(-4%, -9%, 0) rotate(-9deg) scale(1.06);
+  }
+  20% {
+    transform: translate3d(5%, 3%, 0) rotate(7deg) scale(0.97);
+  }
+  30% {
+    transform: translate3d(-3%, 6%, 0) rotate(-5deg) scale(1.04);
+  }
+  40% {
+    transform: translate3d(4%, -7%, 0) rotate(10deg) scale(1.02);
+  }
+  50% {
+    transform: translate3d(-5%, 2%, 0) rotate(-7deg) scale(0.98);
+  }
+  60% {
+    transform: translate3d(3%, -4%, 0) rotate(5deg) scale(1.05);
+  }
+  70% {
+    transform: translate3d(-2%, 5%, 0) rotate(-8deg) scale(1);
+  }
+  80% {
+    transform: translate3d(4%, -2%, 0) rotate(6deg) scale(1.03);
+  }
+  90% {
+    transform: translate3d(-3%, -5%, 0) rotate(-4deg) scale(0.99);
+  }
+}
+/* Ligne du pseudo : échéance sur deux lignes, note toujours lisible. */
+.customer-card-head {
+  gap: 5px;
+}
+.customer-due {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  line-height: 1.15;
+}
+.customer-due small {
+  display: block !important;
+  font-size: 11px;
+}
+.customer-card .table-pseudo {
+  flex: 0 1 auto;
+  max-width: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.customer-note {
+  flex: 0 0 auto;
+  max-width: 45%;
+  min-width: 0;
+}
+.customer-note.scrolling {
+  flex: 1 1 0;
+  min-width: 74px;
+  max-width: none;
+}
+.customer-card .table-pseudo {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.customer-tags .customer-note {
+  flex: 0 1 auto;
+  min-width: 74px;
+  max-width: 50%;
+  align-self: center;
+}
+.customer-tags .customer-note.scrolling {
+  flex: 1 1 0;
+}

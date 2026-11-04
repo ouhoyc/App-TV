@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Check, Copy, KeyRound, Link2 } from "lucide-react";
 import ContactIcon from "./ContactIcon";
 import Coins from "./StackedCoins";
@@ -57,6 +57,41 @@ function shortDate(s: Subscription) {
       ? { hour: "2-digit" as const, minute: "2-digit" as const }
       : {}),
   }).format(d);
+}
+// Note courte : si elle dépasse, elle défile doucement puis revient.
+function ScrollingNote({ text }: { text: string }) {
+  const box = useRef<HTMLSpanElement>(null),
+    inner = useRef<HTMLSpanElement>(null),
+    [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const b = box.current,
+        i = inner.current;
+      if (!b || !i) return;
+      setShift(Math.max(0, Math.ceil(i.scrollWidth - b.clientWidth)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (box.current) observer.observe(box.current);
+    return () => observer.disconnect();
+  }, [text]);
+  return (
+    <span
+      ref={box}
+      className={"customer-note" + (shift > 0 ? " scrolling" : "")}
+      title={text}
+      style={
+        shift > 0
+          ? ({
+              "--note-shift": `-${shift + 6}px`,
+              "--note-duration": `${Math.max(5, 3 + shift / 18)}s`,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <span ref={inner}>{text}</span>
+    </span>
+  );
 }
 export function accessText(pseudo: string, sub: Subscription) {
   return [
@@ -146,6 +181,8 @@ export function CustomerTable({
           const pseudo = clientPseudo(c, s || undefined);
           const server = s ? serverAddress(s) : "";
           const note = clientNotes(c).split("\n")[0].trim();
+          // Pseudo long : la note passe sur la ligne de l’application.
+          const longName = pseudo.length > 13;
           const key = c.id + ":" + (s?.id || "empty");
           const copyCell = (
             field: "password" | "server",
@@ -207,11 +244,7 @@ export function CustomerTable({
                     <Coins size={18} />
                   </button>
                 )}
-                {note && (
-                  <span className="customer-note" title={note}>
-                    {note}
-                  </span>
-                )}
+                {note && !longName && <ScrollingNote text={note} />}
                 {s && (
                   <span className="customer-due">
                     <strong>{dueLabel(s)}</strong>
@@ -227,6 +260,7 @@ export function CustomerTable({
                   </div>
                   <div className="customer-card-foot">
                     <span className="customer-tags">
+                      {note && longName && <ScrollingNote text={note} />}
                       {s.player && (
                         <span className="customer-tag app">{s.player}</span>
                       )}

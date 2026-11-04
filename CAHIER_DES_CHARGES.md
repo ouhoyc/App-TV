@@ -1,5 +1,23 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.4 — corrections WhatsApp, note, animation
+
+- WhatsApp : un numéro saisi en 06… est converti au format international
+  (33 6…) pour le lien wa.me ; les numéros +33 / 0033 / étrangers restent.
+- Note de la carte client : si elle est trop longue, elle défile doucement
+  puis revient (désactivé si « réduire les animations » est actif). Quand le
+  pseudo est long, la note passe sur la ligne de l’application pour que le
+  pseudo reste entier.
+- Animation de connexion : les lettres SCDR tremblent franchement façon télé
+  cartoon (sauts, rotations, léger rebond), toujours en transforms seuls.
+- Vitesse d’ouverture : l’animation n’ajoute aucune attente (test existant) ;
+  l’attente vient de Face ID, du serveur et du déchiffrement.
+
+### Pistes pour plus tard
+
+- Mesurer sur l’iPhone réel la durée de chaque étape d’ouverture avant de
+  choisir une optimisation.
+
 ## Version 1.1.3 — Accueil : bénéfice du mois
 
 - Le bloc « En ligne » est retiré de l’Accueil : le fournisseur ne fournit
