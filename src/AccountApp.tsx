@@ -456,6 +456,12 @@ export default function AccountApp() {
       autoAttempted.current = true;
       devicePrompt.current = true;
       startOpen();
+      // Réveille le serveur de connexion pendant que Face ID s’affiche.
+      void fetch("/api/account", {
+        method: "HEAD",
+        cache: "no-store",
+        credentials: "omit",
+      }).catch(() => {});
       try {
         const unlocked = await unlockDevice(userId);
         markOpen("Face ID");

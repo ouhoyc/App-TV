@@ -66,4 +66,17 @@ describe("Frontière serveur des comptes", () => {
     expect(r.headers["Cache-Control"]).toContain("no-store");
     expect(JSON.stringify(r.body)).not.toContain("refresh_token");
   });
+  it("répond au réveil HEAD sans lire de session ni de données", async () => {
+    const r = response();
+    let ended = false;
+    r.end = () => {
+      ended = true;
+      return r;
+    };
+    await handler({ method: "HEAD", headers: {} }, r);
+    expect(r.statusCode).toBe(204);
+    expect(ended).toBe(true);
+    expect(r.body).toBeUndefined();
+    expect(r.headers["Cache-Control"]).toBe("no-store");
+  });
 });
