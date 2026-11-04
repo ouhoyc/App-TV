@@ -653,16 +653,17 @@ try {
   });
   await tabs.getByRole("button", { name: "Clients", exact: true }).click();
   await page.getByText("Léa Martin", { exact: true }).waitFor();
-  assert.deepEqual(await page.locator(".customer-table th").allTextContents(), [
-    "Pseudo",
-    "Mot de passe",
-    "Lien",
-    "Durée",
-    "Expiration",
-    "Contact",
-    "Application",
-    "Prix de vente",
-  ]);
+  const leaCard = page
+    .locator(".customer-card")
+    .filter({ hasText: "Léa Martin" });
+  assert.deepEqual(
+    await leaCard.locator(".customer-line > span").allTextContents(),
+    ["Mot de passe", "Lien"],
+  );
+  await leaCard
+    .getByRole("button", { name: "Copier les accès de Léa Martin" })
+    .waitFor();
+  assert.equal(await page.locator(".customer-card .avatar").count(), 0);
   await page
     .getByRole("button", {
       name: "Non réglé : Léa Martin. Marquer comme réglé",
@@ -990,13 +991,13 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   const trialRow = page
-    .locator(".customer-table tr")
+    .locator(".customer-card")
     .filter({ hasText: "Test24h Snap" });
   await trialRow.getByText("Test 24 h", { exact: true }).waitFor();
   await trialRow.getByText("IBO Player", { exact: true }).waitFor();
   assert.equal(
     await page
-      .locator(".customer-table tbody tr")
+      .locator(".customer-card")
       .first()
       .getByRole("button", { name: "Test24h Snap", exact: true })
       .count(),

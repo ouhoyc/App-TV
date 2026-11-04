@@ -3653,3 +3653,635 @@ textarea {
 .live-status.is-online {
   color: var(--good-text);
 }
+
+/* ==========================================================================
+   Version 1.1.0 — design « Liquid Glass » (variante A validée le 4 novembre).
+   Mêmes couleurs, mêmes écrans : matière translucide simulée par dégradés
+   (aucun backdrop-filter sur l’en-tête ni la navigation), grands titres,
+   listes groupées, cartes clients colorées par panel (Diogo jaune,
+   Poyeland bleu). Les statuts d’échéance ne sont plus colorés.
+   ========================================================================== */
+:root {
+  --glass: linear-gradient(160deg, #ffffff14, #ffffff06);
+  --glass-strong: linear-gradient(160deg, #2a313b, #191d22);
+  --glass-line: #ffffff1c;
+  --glass-shine: inset 0 1px 0 #ffffff1f;
+  --diogo: #f4cc5b;
+  --poyeland: #83adff;
+}
+.main-shell {
+  background:
+    radial-gradient(120% 420px at 85% -60px, #3f66ff2e, transparent 70%),
+    var(--bg);
+}
+.header-panel-link,
+.settings-gear {
+  background: var(--glass) !important;
+  border: 1px solid var(--glass-line) !important;
+  box-shadow: var(--glass-shine);
+}
+.header-panel-link {
+  border-radius: 999px !important;
+  font-weight: 600;
+}
+.settings-gear {
+  border-radius: 50% !important;
+}
+.clientele-filter {
+  border-radius: 999px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shine);
+}
+.page-heading h1 {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.primary {
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5b7cff, #3f66ff);
+  box-shadow:
+    inset 0 1px 0 #ffffff4d,
+    0 12px 26px -14px #3f66ff;
+  font-weight: 650;
+}
+.secondary {
+  border-radius: 999px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+}
+.panel,
+.reseller-manager,
+.settings-panel {
+  border-radius: 24px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shine);
+}
+.section-heading h2 {
+  font-size: 20px;
+  font-weight: 750;
+}
+.text-button {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8fa6ff;
+}
+
+/* Accueil : anneau de progression autour du nombre de clients. */
+.activity-card {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 18px;
+  align-items: center;
+  text-align: left;
+  border-radius: 28px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shine);
+}
+.activity-card::before,
+.activity-card::after {
+  display: none;
+}
+.activity-card-top {
+  grid-row: 1 / span 3;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#5b7cff 0 var(--share, 0%), #ffffff17 0);
+  box-shadow: 0 0 36px -8px #3f66ff99;
+  position: relative;
+}
+.activity-card-top::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: #14181d;
+}
+.activity-number {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  font-size: 38px !important;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+.activity-icon {
+  display: none;
+}
+.activity-label {
+  font-size: 22px !important;
+  font-weight: 700;
+  margin: 0 !important;
+  align-self: end;
+}
+.activity-card p {
+  font-size: 15px !important;
+  color: var(--muted);
+  margin: 4px 0 0 !important;
+  align-self: start;
+}
+.activity-card progress {
+  display: none;
+}
+.urgency-strip {
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.urgency-strip > button {
+  border-radius: 24px;
+  border: 1px solid var(--glass-line);
+  background: var(--glass);
+  box-shadow: var(--glass-shine);
+}
+.urgency-strip > button + button {
+  border-left: 1px solid var(--glass-line);
+}
+.urgency-icon {
+  border-radius: 50%;
+}
+.urgency-strip strong {
+  font-size: 26px;
+}
+.urgency-strip small {
+  font-size: 13px !important;
+  color: #c8d0dc;
+}
+
+/* Listes d’échéances : séparateurs fins, couleur du panel, sans initiale. */
+.expiry-row {
+  position: relative;
+  padding-left: 14px !important;
+  border-bottom: 1px solid #ffffff12;
+}
+.expiry-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 4px;
+  background: #ffffff26;
+}
+.expiry-row.panel-diogo::before {
+  background: var(--diogo);
+}
+.expiry-row.panel-poyeland::before {
+  background: var(--poyeland);
+}
+.expiry-row.panel-diogo .row-main strong {
+  color: var(--diogo);
+}
+.expiry-row.panel-poyeland .row-main strong {
+  color: var(--poyeland);
+}
+.expiry-row .avatar {
+  display: none;
+}
+.row-main strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+.row-main small {
+  font-size: 13px;
+}
+.days {
+  color: var(--text);
+  font-weight: 650;
+  font-size: 14px;
+}
+.badge,
+.badge.good,
+.badge.soon,
+.badge.muted-badge {
+  border-radius: 999px;
+  background: #ffffff12;
+  border-color: transparent;
+  color: var(--text);
+  font-size: 12px;
+}
+.badge i {
+  display: none;
+}
+
+/* Clients : sélecteur Accès / Échéances / Archives façon iOS. */
+.tabs {
+  display: flex;
+  gap: 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+}
+.tabs button {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tabs button.active {
+  color: #fff;
+  background: #ffffff1f;
+  box-shadow: var(--glass-shine);
+}
+.tabs button span {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9px;
+  padding: 1px 7px;
+  font-size: 12px;
+}
+.search-box {
+  border-radius: 999px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+}
+.panel-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.panel-filters button {
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #cfd7e3;
+  background: #ffffff0d;
+  border: 1px solid #ffffff1a;
+}
+.panel-filters button.selected {
+  color: #fff;
+  background: #ffffff21;
+}
+.panel-filters button i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--diogo);
+}
+.panel-filters button.panel-poyeland i {
+  background: var(--poyeland);
+}
+.panel-filters button span {
+  color: var(--muted);
+}
+.customer-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.customer-card {
+  --panel-color: #ffffff2e;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 12px 14px 12px 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shine);
+}
+.customer-card.panel-diogo {
+  --panel-color: var(--diogo);
+}
+.customer-card.panel-poyeland {
+  --panel-color: var(--poyeland);
+}
+.customer-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--panel-color);
+}
+.customer-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.customer-card-head .pseudo-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.customer-card .table-pseudo {
+  font-size: 18px;
+  font-weight: 750;
+  text-align: left;
+  min-height: 34px;
+  overflow-wrap: anywhere;
+}
+.customer-due {
+  text-align: right;
+  flex-shrink: 0;
+}
+.customer-due strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+.customer-due small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.customer-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.customer-line > span {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.customer-line code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 15px;
+  color: #e9eef6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.customer-line .icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #ffffff12;
+  flex-shrink: 0;
+}
+.customer-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.customer-tags {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.customer-tag {
+  font-size: 12px;
+  font-weight: 650;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #ffffff12;
+  color: #cfd7e3;
+  white-space: nowrap;
+}
+.customer-tag.app {
+  background: color-mix(in srgb, var(--panel-color) 20%, transparent);
+  color: var(--panel-color);
+}
+.customer-card:not(.panel-diogo):not(.panel-poyeland) .customer-tag.app {
+  color: #cfd7e3;
+}
+.customer-tag.contact {
+  text-decoration: none;
+}
+.copy-access {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 13px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #5b7cff, #3f66ff);
+}
+.toast {
+  white-space: pre-line;
+  border-radius: 20px;
+}
+
+/* Fiche et fenêtres : feuille qui monte du bas sur iPhone. */
+dialog {
+  border-radius: 28px;
+  background: linear-gradient(180deg, #232a33, #171b20);
+  border-color: var(--glass-line);
+}
+.subscription-detail,
+.secret {
+  border-color: #ffffff14;
+}
+.subscription-detail {
+  border-radius: 22px;
+  background: #ffffff0a;
+}
+
+/* Bilan : deux rectangles pleine largeur, ventes en liste lisible. */
+.financial-card {
+  border-radius: 24px;
+}
+.balance-panel-row {
+  border-color: #ffffff12;
+}
+.financial-dashboard .customer-table-wrap {
+  overflow: visible;
+}
+.financial-dashboard .customer-table thead {
+  display: none;
+}
+.financial-dashboard .customer-table,
+.financial-dashboard .customer-table tbody {
+  display: block;
+  white-space: normal;
+}
+.financial-dashboard .customer-table tr {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffffff12;
+}
+.financial-dashboard .customer-table td {
+  display: block;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.financial-dashboard .customer-table td:nth-child(1) {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td:nth-child(2)::before {
+  content: "Panel ";
+}
+.financial-dashboard .customer-table td:nth-child(3) {
+  grid-row: 1;
+  grid-column: 2;
+  text-align: right;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td:nth-child(4)::before {
+  content: "Achat ";
+}
+.financial-dashboard .customer-table td:nth-child(5) {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text);
+}
+.financial-dashboard .customer-table td:nth-child(5)::before {
+  content: "Bénéfice ";
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Médias : sélecteur et bouton Ajouter en pilules. */
+.media-segments {
+  border-radius: 999px;
+  background: var(--glass);
+  border-color: var(--glass-line);
+}
+.media-segments button {
+  border-radius: 999px;
+}
+.media-segments button.selected {
+  background: #ffffff1f;
+}
+.photo-add {
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(180deg, #5b7cff, #3f66ff);
+  padding: 0 16px;
+  min-height: 44px;
+}
+.photo-grid {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+/* Navigation basse : capsule en verre posée dans sa zone (pas de flou). */
+.mobile-nav {
+  background: var(--bg);
+  border-top-color: transparent;
+}
+@media (max-width: 680px), (max-height: 500px) and (pointer: coarse) {
+  .page-heading h1 {
+    font-size: 32px;
+    letter-spacing: -0.8px;
+  }
+  .page-heading > .primary {
+    font-size: 15px;
+  }
+  .content {
+    background: transparent;
+  }
+  .mobile-nav {
+    position: relative;
+    isolation: isolate;
+    height: calc(70px + var(--safe-bottom));
+    padding: 6px 12px var(--safe-bottom);
+  }
+  .mobile-nav::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 4px 10px var(--safe-bottom);
+    border-radius: 999px;
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-line);
+    box-shadow:
+      var(--glass-shine),
+      0 10px 30px -12px #000;
+  }
+  .mobile-nav button {
+    min-height: 60px;
+    font-size: 10px;
+    letter-spacing: -0.2px;
+  }
+  .mobile-nav button.selected {
+    color: #fff;
+  }
+  .mobile-nav button.selected::before {
+    top: 4px;
+    width: 100%;
+    max-width: 62px;
+    height: 54px;
+    border-radius: 999px;
+    background: #3f66ff38;
+    box-shadow: inset 0 1px 0 #ffffff30;
+  }
+  .mobile-nav button.selected svg {
+    color: #8fa6ff;
+  }
+}
+.financial-dashboard .customer-table td,
+.financial-dashboard .customer-table td:first-child {
+  position: static;
+  background: transparent;
+  border: 0;
+  max-width: none;
+  padding: 0;
+}
+.financial-dashboard .customer-table tbody {
+  padding: 0 20px 6px;
+}
+.financial-dashboard .customer-table tr:last-child {
+  border-bottom: 0;
+}
+/* La liste clients n’est plus enfermée dans un second cadre. */
+.panel:has(.customer-cards) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible;
+}
+.panel:has(.customer-cards) > .section-heading {
+  flex-wrap: wrap;
+  padding: 0 0 12px;
+  gap: 10px;
+}
+.panel:has(.customer-cards) > .section-heading .tabs {
+  flex: 1 1 100%;
+}
+.panel:has(.customer-cards) .search-box {
+  margin: 0 0 12px;
+}
+.customer-card,
+.expiry-row {
+  color: var(--text);
+}
