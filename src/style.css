@@ -4852,3 +4852,26 @@ dialog {
 .month-history .balance-month-row {
   margin: 0 20px;
 }
+
+/* Version 1.1.8 — défilement fiable de la note et du pseudo sur iPhone. */
+.customer-note > span,
+.customer-card .table-pseudo > span {
+  display: inline-block;
+  white-space: nowrap;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  will-change: transform;
+}
+.customer-note,
+.customer-card .table-pseudo {
+  overflow: hidden;
+  text-overflow: clip;
+}
+.customer-note.scrolling > span {
+  animation: none !important;
+}
+.customer-card .table-pseudo {
+  display: block;
+  text-align: left;
+}

@@ -1,5 +1,15 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.8 — défilement fiable sur iPhone
+
+- Constat sur l’iPhone réel : la note longue restait coupée (« … ») au lieu
+  de défiler, et le pseudo long était coupé.
+- La longueur est désormais mesurée sur la largeur réelle du texte (après
+  chargement des polices et à chaque redimensionnement) et le défilement est
+  lancé par Web Animations plutôt que par une valeur calculée dans un
+  @keyframes CSS. Le pseudo trop long défile aussi. Désactivé si
+  « Réduire les animations » est actif.
+
 ## Version 1.1.7 — bénéfice du mois calendaire
 
 - Accueil : « Bénéfice de novembre » = ventes et renouvellements datés du

@@ -59,9 +59,11 @@ function shortDate(s: Subscription) {
       : {}),
   }).format(d);
 }
-// Note courte : si elle dépasse, elle défile doucement puis revient.
-function ScrollingNote({ text }: { text: string }) {
-  const box = useRef<HTMLSpanElement>(null),
+// Texte trop long (note ou pseudo) : il défile doucement puis revient.
+// Mesure sur la largeur réelle du texte (fiable sur Safari iOS) et animation
+// par Web Animations, sans valeur calculée dans les @keyframes CSS.
+function useMarquee(text: string) {
+  const box = useRef<HTMLElement>(null),
     inner = useRef<HTMLSpanElement>(null),
     [shift, setShift] = useState(0);
   useLayoutEffect(() => {
@@ -69,29 +71,79 @@ function ScrollingNote({ text }: { text: string }) {
       const b = box.current,
         i = inner.current;
       if (!b || !i) return;
-      setShift(Math.max(0, Math.ceil(i.scrollWidth - b.clientWidth)));
+      const style = getComputedStyle(b);
+      const room =
+        b.clientWidth -
+        (parseFloat(style.paddingLeft) || 0) -
+        (parseFloat(style.paddingRight) || 0);
+      const overflow = Math.ceil(i.getBoundingClientRect().width - room);
+      setShift(overflow > 1 ? overflow : 0);
     };
     measure();
     const observer = new ResizeObserver(measure);
     if (box.current) observer.observe(box.current);
+    if (inner.current) observer.observe(inner.current);
+    void document.fonts?.ready.then(measure);
     return () => observer.disconnect();
   }, [text]);
+  useLayoutEffect(() => {
+    const i = inner.current;
+    if (!i || !shift || matchMedia("(prefers-reduced-motion: reduce)").matches)
+      return;
+    const end = `translateX(-${shift + 4}px)`;
+    const animation = i.animate(
+      [
+        { transform: "translateX(0)", offset: 0 },
+        { transform: "translateX(0)", offset: 0.22 },
+        { transform: end, offset: 0.62 },
+        { transform: end, offset: 0.8 },
+        { transform: "translateX(0)", offset: 1 },
+      ],
+      {
+        duration: Math.max(5000, 3000 + shift * 55),
+        iterations: Infinity,
+        easing: "ease-in-out",
+      },
+    );
+    return () => animation.cancel();
+  }, [shift]);
+  return { box, inner, scrolling: shift > 0 };
+}
+function ScrollingNote({ text }: { text: string }) {
+  const { box, inner, scrolling } = useMarquee(text);
   return (
     <span
-      ref={box}
-      className={"customer-note" + (shift > 0 ? " scrolling" : "")}
+      ref={box as React.RefObject<HTMLSpanElement>}
+      className={"customer-note" + (scrolling ? " scrolling" : "")}
       title={text}
-      style={
-        shift > 0
-          ? ({
-              "--note-shift": `-${shift + 6}px`,
-              "--note-duration": `${Math.max(5, 3 + shift / 18)}s`,
-            } as React.CSSProperties)
-          : undefined
-      }
     >
       <span ref={inner}>{text}</span>
     </span>
+  );
+}
+function ScrollingPseudo({
+  text,
+  className,
+  title,
+  onClick,
+}: {
+  text: string;
+  className: string;
+  title?: string;
+  onClick: () => void;
+}) {
+  const { box, inner, scrolling } = useMarquee(text);
+  return (
+    <button
+      ref={box as React.RefObject<HTMLButtonElement>}
+      type="button"
+      className={className + (scrolling ? " scrolling" : "")}
+      title={title}
+      aria-label={text}
+      onClick={onClick}
+    >
+      <span ref={inner}>{text}</span>
+    </button>
   );
 }
 export function accessText(pseudo: string, sub: Subscription) {
@@ -223,14 +275,12 @@ export function CustomerTable({
           return (
             <li className={"customer-card " + accent} key={key}>
               <div className="customer-card-head">
-                <button
-                  type="button"
+                <ScrollingPseudo
+                  text={pseudo}
                   className={"table-pseudo " + accent}
                   title={s ? panelName(c, s) : undefined}
                   onClick={() => onOpen(c.id)}
-                >
-                  {pseudo}
-                </button>
+                />
                 {s && s.paid !== true && (
                   <button
                     type="button"
