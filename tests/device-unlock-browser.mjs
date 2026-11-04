@@ -48,13 +48,18 @@ async function actor(hasPrf = true, setupRequested = false) {
   let session = true,
     logins = 0;
   let accountGets = 0,
-    workspaceGets = 0;
+    workspaceGets = 0,
+    wakeUps = 0;
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === "GET" && path === "/api/account")
       accountGets++;
     if (route.request().method() === "GET" && path === "/api/workspace")
       workspaceGets++;
+    if (route.request().method() === "HEAD" && path === "/api/account") {
+      wakeUps++;
+      return route.fulfill({ status: 204, body: "" });
+    }
     const body =
       route.request().method() === "POST"
         ? route.request().postDataJSON()
@@ -148,6 +153,7 @@ async function actor(hasPrf = true, setupRequested = false) {
     authenticatorId,
     logins: () => logins,
     requests: () => ({ accountGets, workspaceGets }),
+    wakeUps: () => wakeUps,
     expire: () => {
       expired = true;
     },
@@ -262,8 +268,10 @@ try {
     .getByRole("button", { name: /Se connecter avec Face ID/ })
     .waitFor();
   const beforeStartup = a.requests();
+  const wakeBefore = a.wakeUps();
   await a.page.reload();
   await a.page.getByRole("heading", { name: "Accueil" }).waitFor();
+  assert(a.wakeUps() > wakeBefore, "Face ID must wake the login server");
   assert.equal(a.logins(), 1);
   assert.deepEqual(
     a.requests(),

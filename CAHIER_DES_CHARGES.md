@@ -8,6 +8,9 @@
   ‹ › pour revoir les mois passés (pas de mois futur). Un appui ouvre le Bilan.
 - Carte client : l’échéance garde son texte complet (« Dans 4 j »), en plus
   petit.
+- Ouverture : dès que Face ID s’affiche, un appel HEAD vide réveille la
+  fonction de connexion (réponse 204 immédiate, aucune session ni donnée lue),
+  pour éviter l’attente du réveil serveur après une période d’inactivité.
 
 ## Version 1.1.6 — ajustements carte et animation
 

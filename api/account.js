@@ -10,6 +10,11 @@ import {
   validCredential,
 } from "../lib/server.js";
 export default async function handler(req, res) {
+  // Réveil discret pendant Face ID : aucune lecture de session ni de données.
+  if (req.method === "HEAD") {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(204).end();
+  }
   try {
     prepare(req, res);
     if (req.method === "GET") {
