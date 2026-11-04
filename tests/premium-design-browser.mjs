@@ -656,10 +656,13 @@ try {
   const leaCard = page
     .locator(".customer-card")
     .filter({ hasText: "Léa Martin" });
-  assert.deepEqual(
-    await leaCard.locator(".customer-line > span").allTextContents(),
-    ["Mot de passe", "Lien"],
-  );
+  await leaCard
+    .getByRole("button", { name: "Copier le mot de passe de Léa Martin" })
+    .waitFor();
+  await leaCard
+    .getByRole("button", { name: "Copier le lien de Léa Martin" })
+    .waitFor();
+  assert.equal(await leaCard.locator(".customer-line").count(), 0);
   await leaCard
     .getByRole("button", { name: "Copier les accès de Léa Martin" })
     .waitFor();

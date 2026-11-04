@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy } from "lucide-react";
+import { Check, Copy, KeyRound, Link2 } from "lucide-react";
+import ContactIcon from "./ContactIcon";
 import Coins from "./StackedCoins";
 import {
   financialSummary,
@@ -12,6 +13,7 @@ import {
   serverAddress,
   customerRows,
   panelAccent,
+  clientNotes,
 } from "./commerce";
 import type { Client, ProviderPanel, Subscription } from "./model";
 
@@ -43,6 +45,19 @@ function dueLabel(s: Subscription, now = Date.now()) {
   const days = Math.floor(left / 864e5);
   return days === 0 ? "Aujourd’hui" : `Dans ${days} j`;
 }
+function shortDate(s: Subscription) {
+  const d = new Date(s.expiresAt || s.expires + "T12:00:00");
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "short",
+    ...(d.getFullYear() !== new Date().getFullYear()
+      ? { year: "2-digit" as const }
+      : {}),
+    ...(s.plan === "trial24"
+      ? { hour: "2-digit" as const, minute: "2-digit" as const }
+      : {}),
+  }).format(d);
+}
 export function accessText(pseudo: string, sub: Subscription) {
   return [
     ["Pseudo", pseudo],
@@ -70,7 +85,8 @@ export function CustomerTable({
   order?: CustomerOrder;
   panelName?: (client: Client, sub: Subscription) => string;
 }) {
-  const [filter, setFilter] = useState<PanelFilter>("all");
+  const [filter, setFilter] = useState<PanelFilter>("all"),
+    [copied, setCopied] = useState("");
   const rows = customerRows(clients).map((row) => ({
     ...row,
     accent: (row.subscription
@@ -119,85 +135,95 @@ export function CustomerTable({
           ))}
         </div>
       )}
+      <p className="copy-hint">
+        <Copy size={13} aria-hidden="true" />
+        Touchez le mot de passe ou le lien pour le copier
+      </p>
       <ul className="customer-cards" aria-label="Liste des clients">
         {shown.map(({ client: c, subscription: s, accent }) => {
           const contact = customerContact(c),
             url = contactUrl(contact.platform, contact.value);
           const pseudo = clientPseudo(c, s || undefined);
           const server = s ? serverAddress(s) : "";
-          return (
-            <li
-              className={"customer-card " + accent}
-              key={c.id + ":" + (s?.id || "empty")}
+          const note = clientNotes(c).split("\n")[0].trim();
+          const key = c.id + ":" + (s?.id || "empty");
+          const copyCell = (
+            field: "password" | "server",
+            value: string,
+            label: string,
+          ) => (
+            <button
+              type="button"
+              className={
+                "copy-cell " + field + (copied === key + field ? " copied" : "")
+              }
+              disabled={!value}
+              aria-label={`Copier ${label} de ${pseudo}`}
+              onClick={() => {
+                onCopy(value);
+                setCopied(key + field);
+                window.setTimeout(
+                  () => setCopied((v) => (v === key + field ? "" : v)),
+                  1400,
+                );
+              }}
             >
+              {copied === key + field ? (
+                <Check size={14} aria-hidden="true" />
+              ) : field === "password" ? (
+                <KeyRound size={14} aria-hidden="true" />
+              ) : (
+                <Link2 size={14} aria-hidden="true" />
+              )}
+              <code
+                className={
+                  field === "password" ? "table-plain-secret" : "table-server"
+                }
+              >
+                {value || "—"}
+              </code>
+            </button>
+          );
+          return (
+            <li className={"customer-card " + accent} key={key}>
               <div className="customer-card-head">
-                <span className="pseudo-cell">
+                <button
+                  type="button"
+                  className={"table-pseudo " + accent}
+                  title={s ? panelName(c, s) : undefined}
+                  onClick={() => onOpen(c.id)}
+                >
+                  {pseudo}
+                </button>
+                {s && s.paid !== true && (
                   <button
                     type="button"
-                    className={"table-pseudo " + accent}
-                    title={s ? panelName(c, s) : undefined}
-                    onClick={() => onOpen(c.id)}
+                    className="unpaid-icon"
+                    disabled={busy}
+                    title="Pas encore réglé"
+                    aria-label={`Non réglé : ${pseudo}. Marquer comme réglé`}
+                    onClick={() => onPaid(c, s)}
                   >
-                    {pseudo}
+                    <Coins size={18} />
                   </button>
-                  {s && s.paid !== true && (
-                    <button
-                      type="button"
-                      className="unpaid-icon"
-                      disabled={busy}
-                      title="Pas encore réglé"
-                      aria-label={`Non réglé : ${pseudo}. Marquer comme réglé`}
-                      onClick={() => onPaid(c, s)}
-                    >
-                      <Coins size={19} />
-                    </button>
-                  )}
-                </span>
+                )}
+                {note && (
+                  <span className="customer-note" title={note}>
+                    {note}
+                  </span>
+                )}
                 {s && (
                   <span className="customer-due">
                     <strong>{dueLabel(s)}</strong>
-                    <small>
-                      {new Intl.DateTimeFormat("fr-FR", {
-                        dateStyle: "medium",
-                        ...(s.plan === "trial24"
-                          ? { timeStyle: "short" as const }
-                          : {}),
-                      }).format(
-                        new Date(s.expiresAt || s.expires + "T12:00:00"),
-                      )}
-                    </small>
+                    <small>{shortDate(s)}</small>
                   </span>
                 )}
               </div>
               {s && (
                 <>
-                  <div className="customer-line">
-                    <span>Mot de passe</span>
-                    <code className="table-plain-secret">
-                      {s.password || "—"}
-                    </code>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      disabled={!s.password}
-                      aria-label={"Copier le mot de passe de " + pseudo}
-                      onClick={() => onCopy(s.password)}
-                    >
-                      <Copy size={17} />
-                    </button>
-                  </div>
-                  <div className="customer-line">
-                    <span>Lien</span>
-                    <code className="table-server">{server || "—"}</code>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      disabled={!server}
-                      aria-label={"Copier le lien de " + pseudo}
-                      onClick={() => onCopy(server)}
-                    >
-                      <Copy size={17} />
-                    </button>
+                  <div className="customer-copy">
+                    {copyCell("password", s.password, "le mot de passe")}
+                    {copyCell("server", server, "le lien")}
                   </div>
                   <div className="customer-card-foot">
                     <span className="customer-tags">
@@ -207,9 +233,6 @@ export function CustomerTable({
                       <span className="customer-tag">
                         {planLabels[planOf(s)]}
                       </span>
-                      {s.sale !== undefined && s.sale !== "" && (
-                        <span className="customer-tag">{money(s.sale)}</span>
-                      )}
                       {contact.value &&
                         (url ? (
                           <a
@@ -218,10 +241,12 @@ export function CustomerTable({
                             target="_blank"
                             rel="noopener noreferrer"
                           >
+                            <ContactIcon platform={contact.platform} />
                             {contact.value}
                           </a>
                         ) : (
                           <span className="customer-tag contact">
+                            <ContactIcon platform={contact.platform} />
                             {contact.value}
                           </span>
                         ))}
@@ -235,8 +260,8 @@ export function CustomerTable({
                         onCopy(text, `Accès de ${pseudo} copiés\n${text}`);
                       }}
                     >
-                      <Copy size={16} />
-                      Copier les accès
+                      <Copy size={15} aria-hidden="true" />
+                      Accès
                     </button>
                   </div>
                 </>
