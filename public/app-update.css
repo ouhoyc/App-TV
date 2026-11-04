@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  background: #101727;
+  color: #f2f5ff;
+}
+body {
+  margin: 0;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+}
+main {
+  max-width: 440px;
+  padding: 28px;
+}
+h1 {
+  font-size: 32px;
+}
+p {
+  line-height: 1.6;
+}
+button {
+  background: #d3ff5e;
+  color: #101727;
+  border: 0;
+  border-radius: 12px;
+  padding: 16px 24px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -13,6 +13,7 @@ import {
   emptyVault,
   mergeClients,
   newClient,
+  providerPanels,
   renew,
   searchClients,
   state,
@@ -38,6 +39,49 @@ function fixture() {
   return v;
 }
 describe("Coffre et sauvegardes chiffrées", () => {
+  it("conserve la clé existante et valide deux panels distincts sans toucher aux abonnements", () => {
+    const vault = fixture();
+    vault.provider = {
+      url: "https://8k.online-cms.ru/api/api.php",
+      key: "old-panel-key",
+    };
+    expect(providerPanels(vault.provider)).toEqual([
+      { id: "legacy", name: "Panel 1", key: "old-panel-key" },
+    ]);
+    expect(vault.clients[0].subscriptions[0].panelId).toBeUndefined();
+    vault.provider.panels = [
+      ...providerPanels(vault.provider),
+      { id: "second-panel", name: "Second fournisseur", key: "second-key" },
+    ];
+    vault.clients[0].subscriptions[0].panelId = "second-panel";
+    expect(() => validateVault(vault)).not.toThrow();
+    const original = structuredClone(vault);
+    vault.provider.panels[1].id = "legacy";
+    expect(() => validateVault(vault)).toThrow("panels");
+    expect(() => validateVault(original)).not.toThrow();
+    original.clients[0].subscriptions[0].panelId = "imported-unavailable-panel";
+    expect(() => validateVault(original)).not.toThrow();
+    original.clients[0].subscriptions[0].panelId = 42 as unknown as string;
+    expect(() => validateVault(original)).toThrow();
+  });
+  it("sauvegarde les deux clés et leur association dans le fichier chiffré", async () => {
+    const vault = fixture();
+    vault.provider = {
+      url: "https://8k.online-cms.ru/api/api.php",
+      key: "first-panel-secret",
+      panels: [
+        { id: "first", name: "Fournisseur A", key: "first-panel-secret" },
+        { id: "second", name: "Fournisseur B", key: "second-panel-secret" },
+      ],
+    };
+    vault.clients[0].subscriptions[0].panelId = "second";
+    const raw = await exportBackup(vault, "backup-two-panels-password");
+    expect(raw).not.toContain("first-panel-secret");
+    expect(raw).not.toContain("second-panel-secret");
+    expect(
+      (await decrypt(parseEnvelope(raw), "backup-two-panels-password")).vault,
+    ).toEqual(vault);
+  });
   it("ne conserve aucune donnée client en clair et utilise une clé non exportable", async () => {
     const session = await derive("mot-de-passe-de-test");
     const v = fixture();
