@@ -11,7 +11,7 @@ import {
 } from "../lib/server.js";
 // Réveil : ouvre aussi les connexions vers Supabase (authentification et base)
 // pendant Face ID, sans session ni lecture de données.
-async function warmSupabase() {
+export async function warmSupabase() {
   const url = process.env.SUPABASE_URL,
     key = process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return;
@@ -20,6 +20,12 @@ async function warmSupabase() {
     fetch(url + "/auth/v1/health", { headers: { apikey: key }, signal }),
     fetch(url + "/rest/v1/", {
       method: "HEAD",
+      headers: { apikey: key },
+      signal,
+    }),
+    // Vraie requête vide : la base se réveille ; sans session, le rôle anonyme
+    // n’a aucun droit sur cette table (permission refusée, aucune ligne).
+    fetch(url + "/rest/v1/app_tv_profiles?select=id&limit=0", {
       headers: { apikey: key },
       signal,
     }),
