@@ -1020,19 +1020,12 @@ try {
     animations: "disabled",
   });
   await tabs.getByRole("button", { name: "Accueil", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Voir les clients en ligne", exact: true })
-    .click();
-  const live = page.getByRole("dialog", { name: "Clients en ligne" });
-  await live.getByText("Chaîne de test", { exact: true }).waitFor();
-  await live.getByText("En ligne", { exact: true }).waitFor();
+  assert.equal(await page.locator(".live-card, .live-clients").count(), 0);
+  await page.getByRole("button", { name: "Voir le bilan", exact: true }).waitFor();
   await page.screenshot({
-    path: "/tmp/scdr-live-clients.png",
+    path: "/tmp/scdr-home-month-profit.png",
     animations: "disabled",
   });
-  await page
-    .getByRole("button", { name: "Fermer les connexions", exact: true })
-    .click();
   await tabs.getByRole("button", { name: "Bilan", exact: true }).click();
   await page.getByRole("heading", { name: "Bilan", exact: true }).waitFor();
   assert.equal(

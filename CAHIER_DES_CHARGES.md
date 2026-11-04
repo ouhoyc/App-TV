@@ -1,5 +1,13 @@
 # SCDR TV — cahier des charges et versions
 
+## Version 1.1.3 — Accueil : bénéfice du mois
+
+- Le bloc « En ligne » est retiré de l’Accueil : le fournisseur ne fournit
+  pas la présence réelle, il restait vide. Le composant `LiveClients.tsx`
+  reste dans le code, inutilisé, si la donnée devient disponible.
+- À sa place : carte « Bénéfice du mois » (même calcul que le Bilan) ;
+  un appui ouvre le Bilan.
+
 ## Version 1.1.2 — Bilan : client et couleur du panel
 
 - Chaque vente ou renouvellement affiche le pseudo du client, en jaune

@@ -101,9 +101,10 @@ import {
   panelCost,
   planOf,
   prepareClient,
+  financialSummary,
+  money,
 } from "./commerce";
 import Notifications from "./Notifications";
-import LiveClients from "./LiveClients";
 import { PanelAccess, panelSite } from "./PanelAccess";
 import { takeNotificationClient } from "./notificationNavigation";
 const MediaLibrary = lazy(() => import("./Media"));
@@ -632,6 +633,7 @@ export default function App({
     .sort((a, b) =>
       a.subscription.expires.localeCompare(b.subscription.expires),
     );
+  const monthTotals = financialSummary(vault.clients);
   const panelNameFor = (client: Client, sub: Subscription) =>
     providerPanels(cloud ? cloud.providerFor(client.id) : vault.provider).find(
       (p) => p.id === sub.panelId,
@@ -931,7 +933,25 @@ export default function App({
                   }
                 />
               </button>
-              {cloud && <LiveClients clients={activeClients} cloud={cloud} />}
+              <button
+                type="button"
+                className="month-profit"
+                aria-label="Voir le bilan"
+                onClick={() => navigate("balance")}
+              >
+                <span className="month-profit-icon">
+                  <Coins size={22} />
+                </span>
+                <span className="month-profit-text">
+                  <small>Bénéfice du mois</small>
+                  <strong>
+                    {monthTotals.annualIncomplete
+                      ? "À compléter"
+                      : money(monthTotals.monthly)}
+                  </strong>
+                </span>
+                <ChevronRight size={18} />
+              </button>
               <div className="urgency-strip">
                 <button
                   onClick={() => {
